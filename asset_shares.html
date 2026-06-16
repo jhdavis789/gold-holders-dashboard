@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gold as a share of wealth &amp; market caps</title>
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #1a1a1a;
+    --mute: #666666;
+    --rule: #e5e5e5;
+    --tint: #fafafa;
+    --navy: #00294b;
+    --blue: #005f9e;
+    --teal: #007e6c;
+    --magenta: #a6256e;
+    --sand: #b08040;
+    --sans: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); margin: 0; padding: 0; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 28px; }
+  a { color: var(--blue); }
+
+  /* mast */
+  .mast { padding: 36px 0 24px; border-bottom: 1px solid var(--rule); }
+  .mast-meta { display: flex; justify-content: space-between; font-size: 12px;
+    color: var(--mute); font-weight: 500; margin-bottom: 12px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; line-height: 1.2; }
+  h1 + p { color: var(--mute); font-size: 14px; margin: 0; max-width: 760px; line-height: 1.5; }
+
+  /* controls */
+  section { padding: 26px 0; border-bottom: 1px solid var(--rule); }
+  section:last-of-type { border-bottom: 0; }
+  h2 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 10px; color: var(--ink); }
+
+  .range-toggle { display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--tint); border: 1px solid var(--rule); border-radius: 999px;
+    margin-bottom: 14px; }
+  .range-btn { font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+    color: var(--mute); background: transparent; border: 0; cursor: pointer;
+    padding: 6px 14px; border-radius: 999px; }
+  .range-btn.active { color: var(--ink); background: var(--bg); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .range-btn:hover:not(.active) { color: var(--ink); }
+
+  /* stat strip */
+  .stat-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 20px; }
+  .stat-cell { padding: 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--tint); }
+  .stat-cell .lbl { font-size: 10.5px; color: var(--mute); text-transform: uppercase;
+    letter-spacing: .06em; margin-bottom: 5px; font-weight: 600; }
+  .stat-cell .val { font-size: 20px; font-weight: 700; letter-spacing: -.012em; }
+  .stat-cell .sub { font-size: 11px; color: var(--mute); margin-top: 3px; }
+
+  /* chart */
+  .chart-card { margin-bottom: 20px; }
+  .chart-head { display: flex; justify-content: space-between; gap: 8px;
+    align-items: baseline; margin-bottom: 10px; }
+  .chart-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .chart-note { font-size: 11.5px; color: var(--mute); }
+  .chart-box { height: 380px; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th, td { padding: 6px 9px; text-align: right; border-bottom: 1px solid var(--rule);
+    font-variant-numeric: tabular-nums; }
+  th { background: var(--tint); font-weight: 600; font-size: 11.5px; color: var(--ink); }
+  th:first-child, td:first-child { text-align: left; }
+
+  /* provenance box */
+  .prov { font-size: 12px; color: var(--ink); margin: 0 0 16px;
+    padding: 10px 12px; background: var(--tint); border: 1px solid var(--rule);
+    border-radius: 4px; line-height: 1.8; }
+  .prov .plbl { color: var(--mute); font-weight: 600; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .05em; margin-right: 6px; }
+
+  /* note tags */
+  .nt { display: inline-block; font-size: 10px; font-weight: 600; color: var(--mute);
+    border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px;
+    margin-left: 4px; vertical-align: middle; text-transform: uppercase; letter-spacing: .04em; }
+  .nt.est { color: var(--sand); border-color: currentColor; }
+
+  .foot { padding: 22px 0 40px; font-size: 11px; color: var(--mute); line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="mast">
+  <div class="mast-meta">
+    <span>Gold &middot; share of wealth &amp; market caps</span>
+    <span>Prototype &middot; 2026-06-15</span>
+  </div>
+  <h1>Gold as a share of wealth &amp; market caps</h1>
+  <p>Above-ground gold market cap measured against three denominators: global equity market cap (1975+), total global financial assets — banks + insurance + pensions + OFIs (1990+), and global household net wealth (2000+). Each dot is a genuine data point; straight lines only.</p>
+</div>
+
+<!-- Snapshot stats -->
+<section>
+  <h2>Current snapshot &mdash; 2026-05-14</h2>
+  <div class="stat-strip">
+    <div class="stat-cell">
+      <div class="lbl">Gold market cap</div>
+      <div class="val">$30.8T</div>
+      <div class="sub">221.5 kt &times; $4,325 spot</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">% of total financial assets</div>
+      <div class="val" style="color:var(--navy)">5.6%</div>
+      <div class="sub">vs ~$550T FSB est. &middot; banks + ins. + pensions + OFIs</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">% of global equity mcap</div>
+      <div class="val" style="color:var(--teal)">19.9%</div>
+      <div class="sub">vs $155T (WFE 2025 end-year)</div>
+    </div>
+  </div>
+  <div class="prov">
+    <span class="plbl">Numerator</span> above-ground gold stock (WGC, ~221.5 kt) &times; 32,150.7 oz/t &times; $4,325 spot
+    <br>
+    <span class="plbl">Denominators</span>
+    <b>equity</b>: WFE 2025 &bull;
+    <b>fin. assets</b>: FSB GMR 2024 ($487T end-2023) + extrapolated &bull;
+    <b>household wealth</b>: UBS GWR 2025 (~$510T end-2024)
+  </div>
+</section>
+
+<!-- Chart: gold % of equity mcap -->
+<section>
+  <h2>Gold as % of global equity market cap &mdash; 1975 to 2025</h2>
+  <div class="range-toggle" role="tablist" id="eqToggle">
+    <button class="range-btn" data-chart="eq" data-range="modern" type="button">Modern &middot; 1990 &rarr;</button>
+    <button class="range-btn active" data-chart="eq" data-range="full" type="button">Full history &middot; 1975 &rarr;</button>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head">
+      <div class="chart-title" id="eqTitle">Gold mcap as % of global equity market cap &middot; 1975&ndash;2025</div>
+      <div class="chart-note">Source: World Bank CM.MKT.LCAP.CD + WFE &bull; gold: WGC + LBMA</div>
+    </div>
+    <div class="chart-box"><canvas id="eqChart"></canvas></div>
+    <p style="font-size:11.5px;color:var(--mute);margin:8px 0 0">
+      Denominator: global equity market capitalization. 4–20% band since 1990. ~3.9% at dot-com peak (2000); ~18% at commodity peak (2012); ~14.97% end-2025; 19.9% at 2026-05-14 spot.
+    </p>
+  </div>
+</section>
+
+<!-- Chart: gold % of total financial assets (1990+) -->
+<section>
+  <h2>Gold as % of total global financial assets &mdash; 1990 to 2025</h2>
+  <div class="chart-card">
+    <div class="chart-head">
+      <div class="chart-title">Gold mcap as % of total global financial assets &middot; 1990&ndash;2025</div>
+      <div class="chart-note">Source: FSB Global Monitoring Report (2014+); pre-2014 interpolated vs IMF GFSR / BIS</div>
+    </div>
+    <div class="chart-box"><canvas id="finChart"></canvas></div>
+    <p style="font-size:11.5px;color:var(--mute);margin:8px 0 0">
+      FSB definition: banks + insurance + pension funds + other financial intermediaries + public financial institutions; ~$487T end-2023. Includes bank balance sheets — a broader base than equities+bonds alone. Gold has moved from &lt;1% (2000 equity peak) to 4.25% (end-2025), with 5.6% at current spot.
+    </p>
+  </div>
+</section>
+
+<!-- Chart: gold % of household wealth (2000+) -->
+<section>
+  <h2>Gold as % of global household net wealth &mdash; 2000 to 2024</h2>
+  <div class="chart-card">
+    <div class="chart-head">
+      <div class="chart-title">Gold mcap as % of global household net wealth &middot; 2000&ndash;2024</div>
+      <div class="chart-note">Source: CS GWD 2010 &bull; UBS GWD 2023 &bull; UBS GWR 2024/2025</div>
+    </div>
+    <div class="chart-box"><canvas id="hwChart"></canvas></div>
+    <p style="font-size:11.5px;color:var(--mute);margin:8px 0 0">
+      Household net wealth = financial + non-financial assets minus debt; Credit Suisse / UBS series (current exchange rates). Excludes bank balance sheets, so denominator is smaller and gold's share is higher (~2.7% end-2023; 3.2% end-2024) than against FSB total financial assets. Series begins 2000 &mdash; earliest year with consistent global estimates.
+    </p>
+  </div>
+</section>
+
+<!-- Underlying data table -->
+<section>
+  <h2>Underlying data</h2>
+  <div style="overflow-x:auto">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Gold mcap ($T)</th>
+          <th>Equity mcap ($T)</th>
+          <th>% of equity</th>
+          <th>Total fin. assets ($T)</th>
+          <th>% of fin. assets</th>
+          <th>HH wealth ($T)</th>
+          <th>% of HH wealth</th>
+        </tr>
+      </thead>
+      <tbody id="dataTbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<div class="foot">
+  <b>Script:</b> <code>GOLDBTC/gold/holders/data/scripts/build_asset_shares.py</code>
+  &rarr; <code>data/asset_shares.json</code> &bull; All quantitative values scripted from primary sources.
+  <br>
+  <b>Gold numerator:</b> WGC above-ground stock &times; LBMA PM annual average (1990+); Bretton Woods $35 (1934&ndash;1968); gold-standard $20.67 (pre-1934).
+  <br>
+  <b>Equity:</b> World Bank CM.MKT.LCAP.CD world aggregate (1975&ndash;2023); WFE end-2024 ($126.7T), end-2025 ($151.94T).
+  <br>
+  <b>Total fin. assets:</b> FSB Global Monitoring Report (2014+); pre-2014 interpolated vs IMF GFSR / BIS composites.
+  <br>
+  <b>HH wealth:</b> Credit Suisse GWD 2010 (2000&ndash;2010); UBS GWD 2023 (2000&ndash;2022); UBS GWR 2024 (~$477T); UBS GWR 2025 (~$510T).
+  <br>
+  <span class="nt est">EST</span> = extrapolated / estimated; not published by primary source.
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ---------- colour constants ----------
+const C = {
+  navy:    "#00294b",
+  blue:    "#005f9e",
+  teal:    "#007e6c",
+  magenta: "#a6256e",
+  sand:    "#b08040",
+  mute:    "#666666",
+  rule:    "#e5e5e5",
+  ink:     "#1a1a1a",
+  bg:      "#ffffff"
+};
+
+Chart.defaults.font.family = '"Inter", Helvetica, Arial, sans-serif';
+Chart.defaults.font.size   = 11.5;
+Chart.defaults.color       = C.mute;
+Chart.defaults.borderColor = C.rule;
+
+// ---------- data ----------
+const DATA = {"title": "Gold as a share of major asset bases", "asof": "2026-06-15", "definitions": {"gold_mcap_t_usd": "above-ground gold stock (tonnes) x OZ_PER_TONNE x price (USD/oz), in USD trillions", "equity_mcap_t_usd": "global equity market capitalization, USD trillions; World Bank CM.MKT.LCAP.CD + WFE", "total_fin_assets_t_usd": "total global financial assets (banks + insurance + pensions + OFIs + public FIs), USD trillions; FSB GMR (2014+); pre-2014 interpolated vs IMF GFSR / BIS composites", "household_wealth_t_usd": "global household net wealth (financial + non-financial assets minus debt), USD trillions; CS GWD 2010 + UBS GWD 2023 + UBS GWR 2024/2025", "gold_pct_of_equity": "gold mcap / global equity mcap, percent; available 1975+", "gold_pct_of_fin_assets": "gold mcap / total global financial assets, percent; available 1990+", "gold_pct_of_wealth": "gold mcap / global household net wealth, percent; available 2000+"}, "sources": [{"series": "gold_stocks_t", "label": "WGC above-ground stock estimates (1990+); USGS/Schmitz historical mine production residuals (pre-1990)", "url": "https://www.gold.org/goldhub/data/above-ground-stocks", "coverage": "1900-2026"}, {"series": "gold_price_usd_oz", "label": "LBMA Gold Price PM annual average (1969+); Bretton Woods official $35 (1934-1968); gold-standard official $20.67 (pre-1934)", "url": "https://www.lbma.org.uk/prices-and-data/precious-metal-prices", "coverage": "1900-2026"}, {"series": "equity_mcap_t_usd", "label": "World Bank CM.MKT.LCAP.CD (world aggregate, 1975-2023); WFE end-2024 ($126.7T), end-2025 ($151.94T)", "url": "https://data.worldbank.org/indicator/CM.MKT.LCAP.CD", "coverage": "1975-2025"}, {"series": "total_fin_assets_t_usd", "label": "FSB Global Monitoring Report on Non-Bank Financial Intermediation (banks + insurance + pensions + OFIs + public FIs; $487T end-2023, 2014+); pre-2014 interpolated vs IMF GFSR / BIS composites", "url": "https://www.fsb.org/work-of-the-fsb/financial-innovation-and-structural-change/non-bank-financial-intermediation/", "coverage": "1990-2025 (extrapolated 2024-2025)"}, {"series": "household_wealth_t_usd", "label": "Credit Suisse Global Wealth Databook 2010 (Table 6-2, years 2000-2010); UBS Global Wealth Databook 2023 (Table 4-3, current FX, years 2000-2022); UBS GWR 2024 (~$477T end-2023); UBS GWR 2025 (~$510T end-2024)", "url": "https://www.ubs.com/global/en/wealthmanagement/insights/global-wealth-report.html", "coverage": "2000-2024"}], "caveats": ["Pre-2014 FSB total financial assets are interpolated anchors, not FSB-published figures.", "Household net wealth (UBS/CS) excludes institutional/bank-balance-sheet assets; ~$117T in 2000 vs FSB $155T because FSB includes bank assets.", "'worthofeverything.com'-style aggregators (e.g., Visual Capitalist 'All of the World's Money') publish single-snapshot totals from $1-2 quadrillion (gross, double-counting financial claims). We use net household wealth and FSB total financial assets instead, as these have consistent annual series and clear methodologies.", "2024-2025 FSB figures are extrapolated estimates pending FSB GMR 2025 (expected late 2025/early 2026)."], "series": [{"year": 1900, "gold_stocks_t": 13500, "gold_price_usd_oz": 20.67, "gold_mcap_t_usd": 0.009}, {"year": 1910, "gold_stocks_t": 21000, "gold_price_usd_oz": 20.67, "gold_mcap_t_usd": 0.014}, {"year": 1920, "gold_stocks_t": 27500, "gold_price_usd_oz": 20.67, "gold_mcap_t_usd": 0.018}, {"year": 1930, "gold_stocks_t": 33000, "gold_price_usd_oz": 20.67, "gold_mcap_t_usd": 0.022}, {"year": 1940, "gold_stocks_t": 38000, "gold_price_usd_oz": 33.85, "gold_mcap_t_usd": 0.041}, {"year": 1950, "gold_stocks_t": 45000, "gold_price_usd_oz": 35.0, "gold_mcap_t_usd": 0.051}, {"year": 1960, "gold_stocks_t": 60000, "gold_price_usd_oz": 35.27, "gold_mcap_t_usd": 0.068}, {"year": 1970, "gold_stocks_t": 92000, "gold_price_usd_oz": 35.94, "gold_mcap_t_usd": 0.106}, {"year": 1975, "gold_stocks_t": 98500, "gold_price_usd_oz": 160.86, "gold_mcap_t_usd": 0.509, "equity_mcap_t_usd": 1.15, "gold_pct_of_equity": 44.27}, {"year": 1980, "gold_stocks_t": 106000, "gold_price_usd_oz": 614.61, "gold_mcap_t_usd": 2.094, "equity_mcap_t_usd": 2.53, "gold_pct_of_equity": 82.77}, {"year": 1985, "gold_stocks_t": 114000, "gold_price_usd_oz": 317.26, "gold_mcap_t_usd": 1.163, "equity_mcap_t_usd": 4.68, "gold_pct_of_equity": 24.85}, {"year": 1990, "gold_stocks_t": 122500, "gold_price_usd_oz": 383.51, "gold_mcap_t_usd": 1.51, "equity_mcap_t_usd": 9.4, "gold_pct_of_equity": 16.06, "total_fin_assets_t_usd": 80.0, "gold_pct_of_fin_assets": 1.89}, {"year": 1992, "gold_stocks_t": 125500, "gold_price_usd_oz": 343.82, "gold_mcap_t_usd": 1.387, "equity_mcap_t_usd": 10.9, "gold_pct_of_equity": 12.72, "total_fin_assets_t_usd": 90.0, "gold_pct_of_fin_assets": 1.54}, {"year": 1994, "gold_stocks_t": 129000, "gold_price_usd_oz": 384.0, "gold_mcap_t_usd": 1.593, "equity_mcap_t_usd": 15.1, "gold_pct_of_equity": 10.55, "total_fin_assets_t_usd": 102.0, "gold_pct_of_fin_assets": 1.56}, {"year": 1995, "gold_stocks_t": 130500, "gold_price_usd_oz": 384.0, "gold_mcap_t_usd": 1.611, "equity_mcap_t_usd": 17.8, "gold_pct_of_equity": 9.05, "total_fin_assets_t_usd": 110.0, "gold_pct_of_fin_assets": 1.46}, {"year": 1996, "gold_stocks_t": 132500, "gold_price_usd_oz": 387.82, "gold_mcap_t_usd": 1.652, "equity_mcap_t_usd": 20.2, "gold_pct_of_equity": 8.18, "total_fin_assets_t_usd": 120.0, "gold_pct_of_fin_assets": 1.38}, {"year": 1998, "gold_stocks_t": 135500, "gold_price_usd_oz": 294.24, "gold_mcap_t_usd": 1.281, "equity_mcap_t_usd": 26.5, "gold_pct_of_equity": 4.83, "total_fin_assets_t_usd": 140.0, "gold_pct_of_fin_assets": 0.92}, {"year": 2000, "gold_stocks_t": 138500, "gold_price_usd_oz": 279.11, "gold_mcap_t_usd": 1.242, "equity_mcap_t_usd": 31.9, "gold_pct_of_equity": 3.89, "total_fin_assets_t_usd": 155.0, "gold_pct_of_fin_assets": 0.8, "household_wealth_t_usd": 117.8, "gold_pct_of_wealth": 1.05}, {"year": 2002, "gold_stocks_t": 142500, "gold_price_usd_oz": 309.68, "gold_mcap_t_usd": 1.419, "equity_mcap_t_usd": 23.0, "gold_pct_of_equity": 6.17, "total_fin_assets_t_usd": 175.0, "gold_pct_of_fin_assets": 0.81}, {"year": 2004, "gold_stocks_t": 148500, "gold_price_usd_oz": 409.72, "gold_mcap_t_usd": 1.956, "equity_mcap_t_usd": 37.2, "gold_pct_of_equity": 5.26, "total_fin_assets_t_usd": 205.0, "gold_pct_of_fin_assets": 0.95}, {"year": 2005, "gold_stocks_t": 151500, "gold_price_usd_oz": 444.74, "gold_mcap_t_usd": 2.166, "equity_mcap_t_usd": 43.8, "gold_pct_of_equity": 4.95, "total_fin_assets_t_usd": 225.0, "gold_pct_of_fin_assets": 0.96, "household_wealth_t_usd": 182.2, "gold_pct_of_wealth": 1.19}, {"year": 2006, "gold_stocks_t": 155000, "gold_price_usd_oz": 603.92, "gold_mcap_t_usd": 3.009, "equity_mcap_t_usd": 50.8, "gold_pct_of_equity": 5.92, "total_fin_assets_t_usd": 250.0, "gold_pct_of_fin_assets": 1.2}, {"year": 2007, "gold_stocks_t": 158000, "gold_price_usd_oz": 695.39, "gold_mcap_t_usd": 3.531, "equity_mcap_t_usd": 60.7, "gold_pct_of_equity": 5.82, "total_fin_assets_t_usd": 280.0, "gold_pct_of_fin_assets": 1.26}, {"year": 2008, "gold_stocks_t": 160500, "gold_price_usd_oz": 871.96, "gold_mcap_t_usd": 4.497, "equity_mcap_t_usd": 32.6, "gold_pct_of_equity": 13.8, "total_fin_assets_t_usd": 275.0, "gold_pct_of_fin_assets": 1.64}, {"year": 2009, "gold_stocks_t": 163000, "gold_price_usd_oz": 972.35, "gold_mcap_t_usd": 5.094, "equity_mcap_t_usd": 47.4, "gold_pct_of_equity": 10.75, "total_fin_assets_t_usd": 295.0, "gold_pct_of_fin_assets": 1.73}, {"year": 2010, "gold_stocks_t": 166000, "gold_price_usd_oz": 1224.53, "gold_mcap_t_usd": 6.537, "equity_mcap_t_usd": 54.7, "gold_pct_of_equity": 11.95, "total_fin_assets_t_usd": 315.0, "gold_pct_of_fin_assets": 2.08, "household_wealth_t_usd": 252.1, "gold_pct_of_wealth": 2.59}, {"year": 2011, "gold_stocks_t": 169000, "gold_price_usd_oz": 1571.52, "gold_mcap_t_usd": 8.541, "equity_mcap_t_usd": 47.1, "gold_pct_of_equity": 18.14, "total_fin_assets_t_usd": 330.0, "gold_pct_of_fin_assets": 2.59}, {"year": 2012, "gold_stocks_t": 172000, "gold_price_usd_oz": 1668.98, "gold_mcap_t_usd": 9.228, "equity_mcap_t_usd": 53.0, "gold_pct_of_equity": 17.41, "total_fin_assets_t_usd": 340.0, "gold_pct_of_fin_assets": 2.71}, {"year": 2013, "gold_stocks_t": 175000, "gold_price_usd_oz": 1411.23, "gold_mcap_t_usd": 7.939, "equity_mcap_t_usd": 64.7, "gold_pct_of_equity": 12.27, "total_fin_assets_t_usd": 355.0, "gold_pct_of_fin_assets": 2.24}, {"year": 2014, "gold_stocks_t": 178000, "gold_price_usd_oz": 1266.4, "gold_mcap_t_usd": 7.245, "equity_mcap_t_usd": 66.4, "gold_pct_of_equity": 10.91, "total_fin_assets_t_usd": 370.0, "gold_pct_of_fin_assets": 1.96}, {"year": 2015, "gold_stocks_t": 181000, "gold_price_usd_oz": 1160.06, "gold_mcap_t_usd": 6.749, "equity_mcap_t_usd": 61.7, "gold_pct_of_equity": 10.94, "total_fin_assets_t_usd": 380.0, "gold_pct_of_fin_assets": 1.78, "household_wealth_t_usd": 297.7, "gold_pct_of_wealth": 2.27}, {"year": 2016, "gold_stocks_t": 184500, "gold_price_usd_oz": 1250.74, "gold_mcap_t_usd": 7.418, "equity_mcap_t_usd": 64.7, "gold_pct_of_equity": 11.47, "total_fin_assets_t_usd": 395.0, "gold_pct_of_fin_assets": 1.88}, {"year": 2017, "gold_stocks_t": 188000, "gold_price_usd_oz": 1257.15, "gold_mcap_t_usd": 7.599, "equity_mcap_t_usd": 79.2, "gold_pct_of_equity": 9.59, "total_fin_assets_t_usd": 420.0, "gold_pct_of_fin_assets": 1.81}, {"year": 2018, "gold_stocks_t": 191500, "gold_price_usd_oz": 1268.49, "gold_mcap_t_usd": 7.81, "equity_mcap_t_usd": 68.7, "gold_pct_of_equity": 11.37, "total_fin_assets_t_usd": 415.0, "gold_pct_of_fin_assets": 1.88, "household_wealth_t_usd": 359.0, "gold_pct_of_wealth": 2.18}, {"year": 2019, "gold_stocks_t": 195000, "gold_price_usd_oz": 1392.6, "gold_mcap_t_usd": 8.731, "equity_mcap_t_usd": 87.8, "gold_pct_of_equity": 9.94, "total_fin_assets_t_usd": 440.0, "gold_pct_of_fin_assets": 1.98, "household_wealth_t_usd": 388.7, "gold_pct_of_wealth": 2.25}, {"year": 2020, "gold_stocks_t": 198500, "gold_price_usd_oz": 1769.64, "gold_mcap_t_usd": 11.294, "equity_mcap_t_usd": 93.9, "gold_pct_of_equity": 12.03, "total_fin_assets_t_usd": 465.0, "gold_pct_of_fin_assets": 2.43, "household_wealth_t_usd": 422.7, "gold_pct_of_wealth": 2.67}, {"year": 2021, "gold_stocks_t": 202000, "gold_price_usd_oz": 1798.89, "gold_mcap_t_usd": 11.683, "equity_mcap_t_usd": 117.0, "gold_pct_of_equity": 9.99, "total_fin_assets_t_usd": 475.0, "gold_pct_of_fin_assets": 2.46, "household_wealth_t_usd": 465.7, "gold_pct_of_wealth": 2.51}, {"year": 2022, "gold_stocks_t": 205500, "gold_price_usd_oz": 1800.0, "gold_mcap_t_usd": 11.893, "equity_mcap_t_usd": 93.7, "gold_pct_of_equity": 12.69, "total_fin_assets_t_usd": 470.0, "gold_pct_of_fin_assets": 2.53, "household_wealth_t_usd": 454.4, "gold_pct_of_wealth": 2.62}, {"year": 2023, "gold_stocks_t": 209000, "gold_price_usd_oz": 1940.54, "gold_mcap_t_usd": 13.039, "equity_mcap_t_usd": 109.2, "gold_pct_of_equity": 11.94, "total_fin_assets_t_usd": 487.0, "gold_pct_of_fin_assets": 2.68, "household_wealth_t_usd": 477.0, "gold_pct_of_wealth": 2.73}, {"year": 2024, "gold_stocks_t": 216265, "gold_price_usd_oz": 2386.0, "gold_mcap_t_usd": 16.59, "equity_mcap_t_usd": 126.7, "gold_pct_of_equity": 13.09, "total_fin_assets_t_usd": 510.0, "gold_pct_of_fin_assets": 3.25, "household_wealth_t_usd": 510.0, "gold_pct_of_wealth": 3.25}, {"year": 2025, "gold_stocks_t": 220000, "gold_price_usd_oz": 3215.0, "gold_mcap_t_usd": 22.74, "equity_mcap_t_usd": 151.94, "gold_pct_of_equity": 14.97, "total_fin_assets_t_usd": 535.0, "gold_pct_of_fin_assets": 4.25}, {"year": 2026, "gold_stocks_t": 221500, "gold_price_usd_oz": 4325.0, "gold_mcap_t_usd": 30.8, "label": "2026-05-14"}]};
+
+const SERIES = DATA.series;
+
+// ---- chart helpers ----
+function mkDS(label, color, pts){
+  return {
+    label, data: pts,
+    borderColor: color, backgroundColor: "transparent",
+    borderWidth: 2, tension: 0,
+    pointRadius: 3.5, pointBackgroundColor: C.bg,
+    pointBorderColor: color, pointBorderWidth: 1.5,
+    pointHoverRadius: 5,
+    spanGaps: true
+  };
+}
+
+function mkChart(canvasId, labels, datasets, yLabel){
+  return new Chart(document.getElementById(canvasId), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "top", align: "end",
+          labels: { color: C.ink, boxWidth: 14, boxHeight: 2, padding: 14,
+            font: { family: '"Inter", sans-serif', size: 12 } }
+        },
+        tooltip: {
+          backgroundColor: C.navy, titleColor: "#fff", bodyColor: "#fff", padding: 10,
+          callbacks: {
+            label: ctx => ctx.parsed.y == null
+              ? `${ctx.dataset.label}: n/a`
+              : `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: C.rule, drawTicks: false }, border: { color: C.ink },
+          ticks: { color: C.mute, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+        y: { grid: { color: C.rule, drawTicks: false }, border: { color: C.ink },
+          title: { display: !!yLabel, text: yLabel, color: C.mute, font: { size: 11 } },
+          ticks: { color: C.mute, callback: v => v + "%" } }
+      }
+    }
+  });
+}
+
+// ---- equity chart ----
+function renderEqChart(range){
+  const rows = range === "modern"
+    ? SERIES.filter(r => r.year >= 1990 && r.gold_pct_of_equity != null)
+    : SERIES.filter(r => r.gold_pct_of_equity != null);
+  const labels = rows.map(r => r.label ? r.label.replace(/^\d{4}-/, "'") : String(r.year));
+  if (window._eqChart) window._eqChart.destroy();
+  window._eqChart = mkChart(
+    "eqChart", labels,
+    [mkDS("Gold % of equity mcap", C.teal, rows.map(r => r.gold_pct_of_equity ?? null))],
+    "% of global equity mcap"
+  );
+  const title = document.getElementById("eqTitle");
+  title.textContent = range === "modern"
+    ? "Gold mcap as % of global equity market cap · 1990–2025"
+    : "Gold mcap as % of global equity market cap · 1975–2025";
+}
+
+// init equity chart
+renderEqChart("full");
+document.querySelectorAll("[data-chart='eq']").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-chart='eq']").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderEqChart(btn.dataset.range);
+  });
+});
+
+// ---- total financial assets chart ----
+(function(){
+  const rows = SERIES.filter(r => r.gold_pct_of_fin_assets != null);
+  const labels = rows.map(r => String(r.year));
+  mkChart(
+    "finChart", labels,
+    [mkDS("Gold % of total financial assets", C.navy, rows.map(r => r.gold_pct_of_fin_assets ?? null))],
+    "% of total financial assets"
+  );
+})();
+
+// ---- household wealth chart ----
+(function(){
+  const rows = SERIES.filter(r => r.gold_pct_of_wealth != null);
+  const labels = rows.map(r => String(r.year));
+  mkChart(
+    "hwChart", labels,
+    [mkDS("Gold % of household net wealth", C.magenta, rows.map(r => r.gold_pct_of_wealth ?? null))],
+    "% of household net wealth"
+  );
+})();
+
+// ---- data table ----
+(function(){
+  const tbody = document.getElementById("dataTbody");
+  // Rows that have at least one of the three series
+  const rows = SERIES.filter(r =>
+    r.gold_pct_of_equity != null || r.gold_pct_of_fin_assets != null || r.gold_pct_of_wealth != null
+  );
+  const fmt = (v, d) => v != null ? v.toFixed(d) : "—";
+  const fmtPct = (v) => v != null ? v.toFixed(2) + "%" : "—";
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${r.label || r.year}</td>
+    <td>${r.gold_mcap_t_usd.toFixed(1)}</td>
+    <td>${fmt(r.equity_mcap_t_usd, 1)}</td>
+    <td>${fmtPct(r.gold_pct_of_equity)}</td>
+    <td>${fmt(r.total_fin_assets_t_usd, 0)}</td>
+    <td>${fmtPct(r.gold_pct_of_fin_assets)}</td>
+    <td>${fmt(r.household_wealth_t_usd, 1)}</td>
+    <td>${fmtPct(r.gold_pct_of_wealth)}</td>
+  </tr>`).join("");
+})();
+</script>
+</body>
+</html>

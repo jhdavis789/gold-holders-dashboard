@@ -111,6 +111,7 @@
     <div class="tab" data-tab="trends">Trends</div>
     <div class="tab" data-tab="returns">Rolling returns</div>
     <div class="tab" data-tab="corr">Correlations</div>
+    <div class="tab" data-tab="wealth">Wealth share</div>
   </div>
 
   <!-- SNAPSHOT -->
@@ -210,6 +211,13 @@
       <div id="corrMatrix" style="overflow-x:auto"></div>
       <div class="foot" id="corrFoot"></div>
     </div>
+  </div>
+
+  <!-- WEALTH SHARE — gold as % of wealth & market caps (isolated iframe to avoid CSS/JS/Chart.defaults collisions) -->
+  <div id="wealth" style="display:none">
+    <iframe id="wsFrame" src="asset_shares.html" title="Gold as a share of wealth &amp; market caps"
+            style="width:100%;border:0;height:1400px;background:#fff;border-radius:12px"
+            onload="try{this.style.height=(this.contentWindow.document.body.scrollHeight+48)+'px'}catch(e){}"></iframe>
   </div>
 
   <div class="byline">By JAOD &amp; (mainly) Claude · all figures scripted from primary sources · <a href="sources.html">Data sources &amp; methods →</a></div>
@@ -615,6 +623,7 @@ function applyState(){
   document.getElementById('trends').style.display = state.tab==='trends'?'':'none';
   document.getElementById('returns').style.display = state.tab==='returns'?'':'none';
   document.getElementById('corr').style.display = state.tab==='corr'?'':'none';
+  document.getElementById('wealth').style.display = state.tab==='wealth'?'':'none';
   document.querySelectorAll('#sectorSeg button').forEach(b=>b.classList.toggle('on',b.dataset.sector===state.sector));
   document.querySelectorAll('#windowSeg button').forEach(b=>b.classList.toggle('on',b.dataset.w===state.window));
   document.querySelectorAll('#scaleSeg button').forEach(b=>b.classList.toggle('on',b.dataset.scale===state.scale));
