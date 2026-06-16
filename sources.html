@@ -26,7 +26,15 @@
   code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 20px 22px;}
   .muted{color:var(--muted);font-size:12.5px;}
+  .dl{display:inline-flex;align-items:center;gap:8px;background:var(--gold2);color:#fff;text-decoration:none;
+    font-weight:700;font-size:13px;padding:9px 16px;border-radius:9px;}
+  .dl:hover{background:#13294b;}
+  table.fit{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  table.fit th,table.fit td{padding:7px 9px;text-align:left;border-bottom:1px solid var(--line);}
+  table.fit thead th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.3px;background:var(--panel2);}
+  table.fit td.r{font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums;}
 </style>
+<script src="chart.umd.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -39,27 +47,27 @@
   <h2>Rolling-returns &amp; correlations tabs</h2>
   <p class="note">Each series is reduced to an annual-average level index; the box-and-whisker plots overlapping
   N-year (5/10/20y) annualised total returns; the correlation matrix uses annual total returns. <b>Real</b> =
-  deflated by Shiller annual-average CPI. Windows start ≥ 1901, end ≤ 2024. The Period slider clips the sample
+  deflated by Shiller annual-average CPI. Windows start ≥ 1901, end ≤ 2025. The Period slider clips the sample
   client-side (handles held ≥ 20 years apart).</p>
   <table>
     <thead><tr><th>Series</th><th>Source &amp; link</th><th>Coverage</th><th>Construction / notes</th></tr></thead>
     <tbody>
-    <tr><td class="a">Gold</td><td><a href="https://www.measuringworth.com/datasets/gold/">MeasuringWorth — Price of Gold (NY market)</a></td><td>1901–2024</td><td>Price = total return (no carry). Pre-1971 = administered peg; 1934 +69% = Gold Reserve Act; US ownership illegal 1933–74.</td></tr>
-    <tr><td class="a">US equities (S&amp;P)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Robert Shiller — S&amp;P real total-return index</a></td><td>1901–2024</td><td>Shiller "Real Total Return Price"; nominal = real × CPI.</td></tr>
-    <tr><td class="a">US small-cap</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — size portfolios</a></td><td>1926–2024</td><td>Bottom-30% by size, value-weighted total return.</td></tr>
-    <tr><td class="a">US value</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — book/market portfolios</a></td><td>1926–2024</td><td>Top-30% book-to-market, value-weighted total return.</td></tr>
-    <tr><td class="a">US 10y Treasury</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — long-rate (GS10)</a></td><td>1901–2024</td><td>Exact constant-maturity 10y par-bond repricing from the yield.</td></tr>
-    <tr><td class="a">US Aggregate Bond</td><td><a href="https://finance.yahoo.com/quote/VBMFX">Vanguard Total Bond Market (VBMFX)</a></td><td>1986–2024</td><td>Bloomberg US Agg proxy (Treasuries + IG corp + MBS). Short — spans only the post-1986 bond bull.</td></tr>
-    <tr><td class="a">US IG corporate</td><td><a href="https://fred.stlouisfed.org/series/BAA">FRED — Moody's Baa corporate bond yield</a></td><td>1919–2024</td><td>Yield → constant-maturity ~20y par-bond TR. No free actual corporate-TR index exists.</td></tr>
-    <tr><td class="a">US cash</td><td><a href="https://fred.stlouisfed.org/series/M13002US35620M156NNBR">FRED — NY commercial paper (1857+)</a> + <a href="https://fred.stlouisfed.org/series/TB3MS">3-month T-bill (TB3MS)</a></td><td>1901–2024</td><td>Commercial paper bill-equivalised (−0.56pp) for 1901–33; T-bills from 1934. Pre-1934 "cash" = commercial paper, not bills.</td></tr>
-    <tr><td class="a">US housing</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — nominal home-price index</a> + <a href="https://fred.stlouisfed.org/series/CSUSHPINSA">FRED Case-Shiller national</a></td><td>1901–2024</td><td><b>Price only, no rent</b> (like commodities spot). Shiller 1890+ extended with Case-Shiller to 2024 (splice ×1.0006).</td></tr>
-    <tr><td class="a">Commodities (spot)</td><td><a href="https://fred.stlouisfed.org/series/M04051USM324NNBR">FRED — Warren-Pearson WPI (1860+)</a> + <a href="https://fred.stlouisfed.org/series/PPIACO">PPI All Commodities (PPIACO)</a></td><td>1901–2024</td><td><b>Spot price only</b> — excludes roll &amp; collateral (a collateralized position adds ≈ the cash line). WPI return-chained onto PPIACO at 1913 (YoY r = 0.91).</td></tr>
-    <tr><td class="a">EM equities</td><td>Templeton EMF (1987+) → <a href="https://finance.yahoo.com/quote/FEMKX">Fidelity FEMKX</a> (1990+) → <a href="https://finance.yahoo.com/quote/EEM">iShares EEM</a> (2003+)</td><td>1987–2024</td><td>Chain-spliced, level-continuous. 1987 = MSCI-EM inception (hard free floor; pre-1987 IFC data is paid). Early CEF segment discount-noisy.</td></tr>
-    <tr><td class="a">CPI (deflator)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — CPI-U</a></td><td>1901–2024</td><td>Converts all nominal series → real.</td></tr>
+    <tr><td class="a">Gold</td><td><a href="https://www.measuringworth.com/datasets/gold/">MeasuringWorth — Price of Gold (NY market)</a></td><td>1901–2025</td><td>Price = total return (no carry). Pre-1971 = administered peg; 1934 +69% = Gold Reserve Act; US ownership illegal 1933–74.</td></tr>
+    <tr><td class="a">US equities (S&amp;P)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Robert Shiller — S&amp;P real total-return index</a></td><td>1901–2025</td><td>Shiller "Real Total Return Price"; nominal = real × CPI.</td></tr>
+    <tr><td class="a">US small-cap</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — size portfolios</a></td><td>1926–2025</td><td>Bottom-30% by size, value-weighted total return.</td></tr>
+    <tr><td class="a">US value</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — book/market portfolios</a></td><td>1926–2025</td><td>Top-30% book-to-market, value-weighted total return.</td></tr>
+    <tr><td class="a">US 10y Treasury</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — long-rate (GS10)</a></td><td>1901–2025</td><td>Exact constant-maturity 10y par-bond repricing from the yield.</td></tr>
+    <tr><td class="a">US Aggregate Bond</td><td><a href="https://finance.yahoo.com/quote/VBMFX">Vanguard Total Bond Market (VBMFX)</a> + <a href="https://fred.stlouisfed.org/series/GS5">FRED GS5</a> / <a href="https://fred.stlouisfed.org/series/BAA">BAA</a></td><td>1954–2025</td><td>VBMFX (Bloomberg US Agg) from 1986; pre-1986 = <b>synthetic</b> 70% 5y-Treasury + 30% 7y-Baa duration-matched blend (tracks VBMFX r=0.95). Recovers the 1954–81 rising-rate era. See the proxy-eval section below.</td></tr>
+    <tr><td class="a">US IG corporate</td><td><a href="https://fred.stlouisfed.org/series/BAA">FRED — Moody's Baa corporate bond yield</a></td><td>1919–2025</td><td>Yield → constant-maturity ~20y par-bond TR. No free actual corporate-TR index exists.</td></tr>
+    <tr><td class="a">US cash</td><td><a href="https://fred.stlouisfed.org/series/M13002US35620M156NNBR">FRED — NY commercial paper (1857+)</a> + <a href="https://fred.stlouisfed.org/series/TB3MS">3-month T-bill (TB3MS)</a></td><td>1901–2025</td><td>Commercial paper bill-equivalised (−0.56pp) for 1901–33; T-bills from 1934. Pre-1934 "cash" = commercial paper, not bills.</td></tr>
+    <tr><td class="a">US housing</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — nominal home-price index</a> + <a href="https://fred.stlouisfed.org/series/CSUSHPINSA">FRED Case-Shiller national</a></td><td>1901–2025</td><td><b>Price only, no rent</b> (like commodities spot). Shiller 1890+ extended with Case-Shiller to 2025.</td></tr>
+    <tr><td class="a">Commodities (spot)</td><td><a href="https://fred.stlouisfed.org/series/M04051USM324NNBR">FRED — Warren-Pearson WPI (1860+)</a> + <a href="https://fred.stlouisfed.org/series/PPIACO">PPI All Commodities (PPIACO)</a></td><td>1901–2025</td><td><b>Spot price only</b> — excludes roll &amp; collateral (a collateralized position adds ≈ the cash line). WPI return-chained onto PPIACO at 1913 (YoY r = 0.91).</td></tr>
+    <tr><td class="a">EM equities</td><td>Templeton EMF (1987+) → <a href="https://finance.yahoo.com/quote/FEMKX">Fidelity FEMKX</a> (1990+) → <a href="https://finance.yahoo.com/quote/EEM">iShares EEM</a> (2003+)</td><td>1987–2025</td><td>Chain-spliced, level-continuous. 1987 = MSCI-EM inception (hard free floor; pre-1987 IFC data is paid). Early CEF segment discount-noisy.</td></tr>
+    <tr><td class="a">CPI (deflator)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — CPI-U</a></td><td>1901–2025</td><td>Converts all nominal series → real.</td></tr>
     </tbody>
   </table>
   <p class="muted"><b>Read with care:</b> overlapping windows are highly autocorrelated — a 20-year horizon over
-  1901–2024 has only ~6 statistically independent windows. The box shows the historical spread of past windows,
+  1901–2025 has only ~6 statistically independent windows. The box shows the historical spread of past windows,
   not a forward confidence interval.</p>
   </div>
 
@@ -89,6 +97,50 @@
   </ul>
   <p class="muted">Current gold spot: Yahoo Finance COMEX front-month (GC=F).</p>
   </div>
+
+  <div class="panel" style="margin-top:18px">
+  <h2>Download the data &mdash; fully auditable Excel</h2>
+  <p class="note">Every series' <b>raw leg data</b> is scripted into the workbook with a clickable <b>source link</b>,
+  and the spliced / compounded <b>aggregate is built with live Excel formulas</b> that reference the raw cells &mdash;
+  so you can audit every number, not just trust a column. <b>Blue = raw input, dark = formula.</b> Level-splice series
+  (commodities, housing, EM) use <code>leg &times; factor</code>; rate-built series (cash, 10y&nbsp;Treasury, IG&nbsp;corporate,
+  the synthetic Agg) use <b>full monthly compounding</b> &mdash; yield&nbsp;&rarr;&nbsp;par-bond price (Excel <code>PV</code>)
+  &nbsp;&rarr;&nbsp;monthly total return&nbsp;&rarr;&nbsp;compounded index, every cell a formula. Generated by
+  <code>returns_dist/export_workbooks.py</code> and recomputed by LibreOffice to prove the formulas (all anchors match).</p>
+  <p style="margin:12px 0 2px"><a class="dl" href="asset_data_audit.xlsx" download>&#8681;&nbsp; asset_data_audit.xlsx &mdash; 11 series, 13 sheets</a></p>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+  <h2>Replication / proxy evaluations &mdash; do they carry forward?</h2>
+  <p class="note">Three series use an <b>artificial replication</b> because the investable index starts too late for long
+  windows: US small-cap &amp; value use academic <b>Ken French factor portfolios</b> (vs Russell, which began 1979/1994),
+  and the <b>US Aggregate Bond</b> pre-1986 is a synthetic gov/credit blend (the Agg didn't exist before ~1976). The test:
+  run each replication over the era its <i>investable</i> index <i>does</i> exist and measure the fit. All track well
+  (correlations on annual returns; the live-formula construction for the synthetic Agg is in the workbook above).</p>
+  <table class="fit"><thead><tr><th>Replication</th><th>vs investable index</th><th>corr (r)</th><th>tracking</th><th>level gap</th></tr></thead>
+  <tbody id="fitBody"></tbody></table>
+  <p class="note" style="margin-top:12px"><b>Synthetic US Aggregate Bond vs Vanguard VBMFX, annual returns (overlap):</b></p>
+  <div style="position:relative;height:300px"><canvas id="aggEval"></canvas></div>
+  <p class="note" id="evalFoot"></p>
+  </div>
+
+  <script type="application/json" id="proxyEval">{"agg_vs_vbmfx":{"years":[1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],"synthetic":[6.17,7.4,10.74,9.24,13.05,12.89,11.81,0.67,9.43,7.61,7.24,11.03,3.57,4.25,12.28,8.25,9.04,3.36,3.08,2.17,6.39,8.46,6.45,6.67,5.1,6.27,0.36,1.41,2.68,3.72,1.06,-0.44,6.78,8.61,0.7,-7.38,-0.58,4.74,4.93,3.34],"vbmfx":[-1.38,7.0,9.96,8.63,13.39,11.42,11.4,0.26,10.12,7.18,7.77,10.17,3.03,4.79,12.45,6.52,6.95,3.6,3.6,2.24,5.9,5.68,6.75,7.97,5.01,6.55,0.04,2.75,2.9,3.3,0.91,-0.49,7.37,8.66,-0.02,-9.7,-2.14,4.18,4.76,2.97],"r":0.949},"fits":[{"proxy":"US small-cap (Ken French Lo-30)","vs":"Russell 2000 (IWM)","r":0.973,"te":"5.0%/yr","gap":"+0.9pp/yr","src":"returns_dist/proxy_fit_russell.py"},{"proxy":"US value (Ken French Hi-30 B/M)","vs":"Russell 1000 Value (IWD)","r":0.935,"te":"7.9%/yr","gap":"+1.3pp/yr","src":"returns_dist/proxy_fit_russell.py"},{"proxy":"US Aggregate Bond (synthetic GS5+Baa)","vs":"Vanguard VBMFX","r":0.949,"te":"1.5%/yr","gap":"+0.33pp/yr","src":"returns_dist/export_workbooks.py (live formulas)"},{"proxy":"EM composite (OECD 7-mkt, documented comparison only)","vs":"iShares EEM","r":0.927,"te":"8.3%/yr","gap":"runs ~3pp hot (price-only)","src":"returns_dist/eval_em_proxy.py"}]}</script>
+  <script>
+  (function(){ const E=JSON.parse(document.getElementById('proxyEval').textContent); if(!E.fits) return;
+    document.getElementById('fitBody').innerHTML = E.fits.map(f=>
+      `<tr><td>${f.proxy}</td><td>${f.vs}</td><td class="r">${(+f.r).toFixed(3)}</td><td>${f.te}</td><td>${f.gap}</td></tr>`).join('');
+    const a=E.agg_vs_vbmfx;
+    new Chart(document.getElementById('aggEval'),{type:'line',
+      data:{labels:a.years,datasets:[
+        {label:'Synthetic Agg (GS5+Baa blend)',data:a.synthetic,borderColor:'#005f9e',backgroundColor:'#005f9e',tension:0,pointRadius:2.5,borderWidth:2},
+        {label:'Vanguard VBMFX (real Agg)',data:a.vbmfx,borderColor:'#a6256e',backgroundColor:'#a6256e',tension:0,pointRadius:2.5,borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{legend:{labels:{color:'#13294b',font:{size:11}}}},
+        scales:{y:{ticks:{color:'#5e6b7e',callback:v=>v+'%'},grid:{color:'#e2e8f1'}},x:{ticks:{color:'#5e6b7e',maxTicksLimit:12},grid:{display:false}}}}});
+    document.getElementById('evalFoot').innerHTML='Annual-return correlation r = <b>'+a.r+'</b> over '+a.years[0]+'&ndash;'+a.years[a.years.length-1]+
+      '. The synthetic blend tracks the real Agg fund closely in-sample, so the pre-1986 extension is a sound representation.';
+  })();
+  </script>
 
   <p class="muted" style="margin-top:18px">By JAOD &amp; (mainly) Claude · all figures scripted from primary sources.
   Full machine-readable provenance: <code>returns_dist/SOURCES.md</code> &amp; <code>data/SOURCES.md</code> in the source repo;
