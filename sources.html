@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Data sources — The World's Gold Holders</title>
+<style>
+  :root{ --bg:#f4f7fb; --panel:#fff; --panel2:#eef2f7; --ink:#13294b; --muted:#5e6b7e;
+    --gold2:#0a4f93; --amber:#13294b; --line:#dce3ec; }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#f7f9fc,#f4f7fb);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 22px 80px;}
+  h1{font-size:27px;margin:0 0 2px;letter-spacing:-.4px;font-weight:700;color:var(--gold2);}
+  h2{font-size:18px;margin:26px 0 6px;color:var(--gold2);border-top:1px solid var(--line);padding-top:18px;}
+  h3{font-size:14px;margin:16px 0 4px;color:var(--ink);text-transform:uppercase;letter-spacing:.4px;}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 8px;}
+  a{color:var(--gold2);}
+  .back{display:inline-block;margin-bottom:10px;font-weight:600;font-size:13px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 4px;}
+  th,td{padding:8px 9px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  thead th{color:var(--muted);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:var(--panel2);}
+  td.a{font-weight:600;white-space:nowrap;}
+  .note{color:var(--muted);font-size:12.5px;}
+  ul{margin:4px 0 4px;padding-left:20px;} li{margin:3px 0;}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 20px 22px;}
+  .muted{color:var(--muted);font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← Back to dashboard</a>
+  <h1>Data sources</h1>
+  <p class="sub">Every quantitative value on the dashboard is scripted from the primary sources below — no
+  numbers are supplied by a model. Hover any figure in the dashboard for its specific source, year and method.</p>
+
+  <div class="panel">
+  <h2>Rolling-returns &amp; correlations tabs</h2>
+  <p class="note">Each series is reduced to an annual-average level index; the box-and-whisker plots overlapping
+  N-year (5/10/20y) annualised total returns; the correlation matrix uses annual total returns. <b>Real</b> =
+  deflated by Shiller annual-average CPI. Windows start ≥ 1901, end ≤ 2024. The Period slider clips the sample
+  client-side (handles held ≥ 20 years apart).</p>
+  <table>
+    <thead><tr><th>Series</th><th>Source &amp; link</th><th>Coverage</th><th>Construction / notes</th></tr></thead>
+    <tbody>
+    <tr><td class="a">Gold</td><td><a href="https://www.measuringworth.com/datasets/gold/">MeasuringWorth — Price of Gold (NY market)</a></td><td>1901–2024</td><td>Price = total return (no carry). Pre-1971 = administered peg; 1934 +69% = Gold Reserve Act; US ownership illegal 1933–74.</td></tr>
+    <tr><td class="a">US equities (S&amp;P)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Robert Shiller — S&amp;P real total-return index</a></td><td>1901–2024</td><td>Shiller "Real Total Return Price"; nominal = real × CPI.</td></tr>
+    <tr><td class="a">US small-cap</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — size portfolios</a></td><td>1926–2024</td><td>Bottom-30% by size, value-weighted total return.</td></tr>
+    <tr><td class="a">US value</td><td><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Ken French Data Library — book/market portfolios</a></td><td>1926–2024</td><td>Top-30% book-to-market, value-weighted total return.</td></tr>
+    <tr><td class="a">US 10y Treasury</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — long-rate (GS10)</a></td><td>1901–2024</td><td>Exact constant-maturity 10y par-bond repricing from the yield.</td></tr>
+    <tr><td class="a">US Aggregate Bond</td><td><a href="https://finance.yahoo.com/quote/VBMFX">Vanguard Total Bond Market (VBMFX)</a></td><td>1986–2024</td><td>Bloomberg US Agg proxy (Treasuries + IG corp + MBS). Short — spans only the post-1986 bond bull.</td></tr>
+    <tr><td class="a">US IG corporate</td><td><a href="https://fred.stlouisfed.org/series/BAA">FRED — Moody's Baa corporate bond yield</a></td><td>1919–2024</td><td>Yield → constant-maturity ~20y par-bond TR. No free actual corporate-TR index exists.</td></tr>
+    <tr><td class="a">US cash</td><td><a href="https://fred.stlouisfed.org/series/M13002US35620M156NNBR">FRED — NY commercial paper (1857+)</a> + <a href="https://fred.stlouisfed.org/series/TB3MS">3-month T-bill (TB3MS)</a></td><td>1901–2024</td><td>Commercial paper bill-equivalised (−0.56pp) for 1901–33; T-bills from 1934. Pre-1934 "cash" = commercial paper, not bills.</td></tr>
+    <tr><td class="a">US housing</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — nominal home-price index</a> + <a href="https://fred.stlouisfed.org/series/CSUSHPINSA">FRED Case-Shiller national</a></td><td>1901–2024</td><td><b>Price only, no rent</b> (like commodities spot). Shiller 1890+ extended with Case-Shiller to 2024 (splice ×1.0006).</td></tr>
+    <tr><td class="a">Commodities (spot)</td><td><a href="https://fred.stlouisfed.org/series/M04051USM324NNBR">FRED — Warren-Pearson WPI (1860+)</a> + <a href="https://fred.stlouisfed.org/series/PPIACO">PPI All Commodities (PPIACO)</a></td><td>1901–2024</td><td><b>Spot price only</b> — excludes roll &amp; collateral (a collateralized position adds ≈ the cash line). WPI return-chained onto PPIACO at 1913 (YoY r = 0.91).</td></tr>
+    <tr><td class="a">EM equities</td><td>Templeton EMF (1987+) → <a href="https://finance.yahoo.com/quote/FEMKX">Fidelity FEMKX</a> (1990+) → <a href="https://finance.yahoo.com/quote/EEM">iShares EEM</a> (2003+)</td><td>1987–2024</td><td>Chain-spliced, level-continuous. 1987 = MSCI-EM inception (hard free floor; pre-1987 IFC data is paid). Early CEF segment discount-noisy.</td></tr>
+    <tr><td class="a">CPI (deflator)</td><td><a href="http://www.econ.yale.edu/~shiller/data.htm">Shiller — CPI-U</a></td><td>1901–2024</td><td>Converts all nominal series → real.</td></tr>
+    </tbody>
+  </table>
+  <p class="muted"><b>Read with care:</b> overlapping windows are highly autocorrelated — a 20-year horizon over
+  1901–2024 has only ~6 statistically independent windows. The box shows the historical spread of past windows,
+  not a forward confidence interval.</p>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+  <h2>Gold-holdings tabs (Snapshot &amp; Trends)</h2>
+
+  <h3>Central-bank reserves</h3>
+  <ul>
+    <li><a href="https://www.gold.org/goldhub/data/gold-reserves-by-country">World Gold Council — Gold Reserves by Country</a> (underlying IMF IFS). Quarterly tonnage, value, % of reserves, 2000-Q1+ (123 countries).</li>
+    <li><a href="https://data.imf.org/en/datasets//IMF.STA:IL">IMF — International Liquidity (IFS)</a>. Annual gold-reserve volume back to 1950 (187 countries + World aggregate) — drives the 50-year / Max trend windows.</li>
+    <li><a href="https://www.worldbank.org/en/research/commodity-markets">World Bank — Commodity Price Data ("Pink Sheet")</a>, annual gold price 1960+ ($35/oz flat 1950–59).</li>
+    <li><a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD">World Bank — GDP (current US$)</a> for the % of GDP metric.</li>
+  </ul>
+
+  <h3>Private / household gold stock (estimates)</h3>
+  <ul>
+    <li><a href="https://www.gold.org/goldhub/research/market-primer/gold-market-primer-market-size-and-structure">World Gold Council — above-ground stocks &amp; market size</a> (India ~25,000t; world private ≈ 144,000t).</li>
+    <li><a href="https://www.steinbeis-research.de/images/pdf-documents/KLEINE%20Financial%20Study%20-%20Gold%20Ownership%20by%20Private%20Individuals%20in%20Germany.pdf">Steinbeis University / Reisebank</a> — Germany private stock survey (9,089t).</li>
+    <li><a href="https://www.gold.org/goldhub/research/gold-demand-trends/us-gold-demand-trends-full-year-2025">WGC US Gold Demand Trends</a> + <a href="https://www.prnewswire.com/news-releases/new-survey-reveals-10-8-of-the-american-population-owns-gold-while-11-6-owns-silver-301122041.html">10.8% ownership survey</a> — US private-stock triangulation.</li>
+    <li>Italy (<a href="https://www.kitco.com/news/article/2025-11-17/italy-considers-one-time-52-tax-cut-private-gold-holdings">Kitco</a>), Turkey (<a href="https://www.turkiyetoday.com/business/explained-why-turkiye-keeps-311b-worth-of-gold-under-pillow-3203406">Türkiye Today / WGC</a>), France &amp; Switzerland (<a href="https://goldbroker.com/news/how-much-gold-french-own-3265">GoldBroker</a>), Vietnam (<a href="https://thevietnamese.org/2025/11/mobilizing-viet-nams-peoples-gold-an-impossible-task-without-public-trust/">National Assembly</a>), China (<a href="https://en.wikipedia.org/wiki/Gold_holdings">analyst compilations</a>).</li>
+  </ul>
+
+  <h3>Household wealth &amp; income (context metrics)</h3>
+  <ul>
+    <li><a href="https://www.ubs.com/global/en/wealthmanagement/insights/global-wealth-report.html">UBS Global Wealth Databook</a> — household wealth (% of wealth metric).</li>
+    <li><a href="https://data.worldbank.org/indicator/NY.GNP.PCAP.CD">World Bank GNI per capita (Atlas)</a> + <a href="https://www.oecd.org/en/data/indicators/household-disposable-income.html">OECD median disposable income</a>.</li>
+  </ul>
+  <p class="muted">Current gold spot: Yahoo Finance COMEX front-month (GC=F).</p>
+  </div>
+
+  <p class="muted" style="margin-top:18px">By JAOD &amp; (mainly) Claude · all figures scripted from primary sources.
+  Full machine-readable provenance: <code>returns_dist/SOURCES.md</code> &amp; <code>data/SOURCES.md</code> in the source repo;
+  every external feed is registered in the research <code>DATA_SOURCES.md</code>.</p>
+</div>
+</body>
+</html>

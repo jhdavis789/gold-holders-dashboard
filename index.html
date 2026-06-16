@@ -77,6 +77,27 @@
   #tooltip{position:fixed;z-index:1000;max-width:340px;background:var(--ink);color:#f4f7fb;font-size:12px;
     line-height:1.45;padding:8px 11px;border-radius:8px;box-shadow:0 6px 22px rgba(19,41,75,.28);
     pointer-events:none;display:none;white-space:normal;}
+  /* What-then explorer */
+  .wtbtn{background:var(--panel);color:var(--gold2);border:1px solid var(--gold2);border-radius:8px;
+    padding:8px 14px;cursor:pointer;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px;}
+  .wtbtn:hover{background:#eaf2fb;}
+  .wtbtn.on{background:linear-gradient(90deg,var(--gold2),var(--amber));color:var(--bg);border-color:transparent;}
+  .wtbtn .dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;}
+  #rrMain{display:flex;gap:16px;align-items:flex-start;}
+  #rrSelBox{position:absolute;border:1px dashed var(--gold2);background:rgba(0,103,185,.12);
+    border-radius:3px;pointer-events:none;display:none;z-index:5;}
+  #rrWhatThen{width:340px;flex:0 0 340px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:13px 14px;max-height:620px;overflow:auto;display:none;}
+  #rrWhatThen h3{margin:0 0 6px;font-size:14px;color:var(--gold2);}
+  #rrWhatThen .wtmeta{font-size:12px;color:var(--muted);margin-bottom:9px;line-height:1.5;}
+  #rrWhatThen .wtmeta b{color:var(--ink);}
+  #rrWhatThen table{font-size:12px;}
+  #rrWhatThen th,#rrWhatThen td{padding:5px 6px;}
+  #rrWhatThen .wtinstr{font-size:12.5px;color:var(--muted);line-height:1.6;}
+  #rrWhatThen .wtinstr b{color:var(--ink);}
+  #rrWhatThen .wtclear{margin-top:11px;background:var(--panel);border:1px solid var(--line);
+    color:var(--gold2);border-radius:7px;padding:6px 12px;font-weight:600;font-size:12px;cursor:pointer;}
+  #rrWhatThen .wtclear:hover{background:#eaf2fb;}
 </style>
 </head>
 <body>
@@ -153,9 +174,13 @@
           </span>
           <span class="rangeval" id="yrLabel">1901–2024</span>
         </span>
+        <span><button id="wtBtn" class="wtbtn" title="Drag across one asset's row to pick a return band, then see every window in it and what the other assets did in those same years"><span class="dot"></span>What&nbsp;then?</button></span>
         <span class="note" id="rrNote" style="margin:0"></span>
       </div>
-      <div id="rrWrap" style="position:relative;height:560px"><canvas id="rrCanvas"></canvas></div>
+      <div id="rrMain">
+        <div id="rrWrap" style="position:relative;flex:1;min-width:0;height:560px"><canvas id="rrCanvas"></canvas><div id="rrSelBox"></div></div>
+        <div id="rrWhatThen"></div>
+      </div>
       <div id="rrTable" style="margin-top:16px"></div>
       <div class="foot" id="rrFoot"></div>
     </div>
@@ -211,7 +236,7 @@ const NAMEFIX = {'China, P.R.: Mainland':'China','Russian Federation':'Russia',
   'United States of America':'United States','Korea, Republic of':'South Korea'};
 const fixName = n => NAMEFIX[n]||n;
 
-let DATA=null, TS=null, RR=null, state={tab:'snapshot',sector:'central_banks',metric:'tonnes',window:'20y',scale:'independent',horizon:'20',basis:'real',yMin:1901,yMax:2024};
+let DATA=null, TS=null, RR=null, state={tab:'snapshot',sector:'central_banks',metric:'tonnes',window:'20y',scale:'independent',horizon:'20',basis:'real',yMin:1901,yMax:2024,whatThen:false};
 
 // boxplot plugin auto-registers when loaded as a script tag; register defensively too.
 if(typeof ChartBoxPlot!=='undefined' && typeof Chart!=='undefined' && Chart.register){
@@ -347,7 +372,7 @@ function renderTrends(){
 }
 
 // ---- rolling-return distribution (box & whisker) ----
-let rrChart=null;
+let rrChart=null, rrRows=[], wtSel=null;
 const RRORDER=['us_equity','us_smallcap','us_value','us_bond','fi','credit','us_cash','gold','housing','commod','em_equity'];
 const YMIN=1901, YMAX=2024, MINSPAN=20;
 const pct1 = v => (v==null?'—':(v>=0?'+':'')+v.toFixed(1)+'%');
@@ -426,6 +451,8 @@ function renderReturns(){
     const a=rrAsset(k);
     rows.push({key:k,label:a.label,color:a.color,source:a.source,arr,years:yy,stats:jstats(arr,yy,N)});
   });
+  rrRows = rows;
+  if(wtSel && !rows.some(r=>r.key===wtSel.key)) wtSel=null;
   const bLab = B==='real' ? 'real (CPI-adjusted)' : 'nominal';
   document.querySelectorAll('#horizonSeg button').forEach(b=>b.classList.toggle('on',b.dataset.h===H));
   document.querySelectorAll('#basisSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===B));
@@ -438,11 +465,12 @@ function renderReturns(){
     const ctx=document.getElementById('rrCanvas').getContext('2d');
     rrChart=new Chart(ctx,{
       type:'boxplot',
+      plugins:[wtDots],
       data:{labels:rows.map(r=>r.label),datasets:[{
         label:H+'y annualised return',
         data:rows.map(r=>r.arr),
         backgroundColor:rows.map(r=>r.color+'2e'), borderColor:rows.map(r=>r.color), borderWidth:1.6,
-        itemRadius:2.3, itemStyle:'circle', itemHitRadius:3,
+        itemRadius:0, itemStyle:'circle', itemHitRadius:3,
         itemBackgroundColor:rows.map(r=>r.color+'2e'), itemBorderColor:rows.map(r=>r.color),
         outlierRadius:0, meanRadius:0, medianColor:'#13294b', padding:14
       }]},
@@ -493,7 +521,91 @@ function renderReturns(){
     +'commodities — Warren-Pearson WPI 1901–12 + FRED PPIACO 1913+ (spot); '
     +'US housing — Shiller nominal home-price index 1890+ extended w/ FRED Case-Shiller to 2024 (price only); '
     +'EM — Templeton EMF 1987–89 + Fidelity FEMKX 1990–2002 + iShares EEM 2003+ (no free MSCI-EM index pre-2003; early CEF segment noisy).';
+  if(wtSel) applyWtStyling();
+  syncWhatThen();
 }
+
+// ---- "What then?" explorer: drag a return band on one asset, see its windows + same-year dots elsewhere ----
+function wtHex(a){ return Math.round(Math.max(0,Math.min(1,a))*255).toString(16).padStart(2,'0'); }
+const wtDots={
+  id:'wtDots',
+  afterDatasetsDraw(chart){
+    if(!rrRows.length) return;
+    const xs=chart.scales.x, ca=chart.chartArea; if(!xs||!ca) return;
+    const ctx=chart.ctx, band=(ca.bottom-ca.top)/rrRows.length, sel=wtSel;
+    ctx.save();
+    rrRows.forEach((r,ri)=>{
+      const cy=ca.top+band*(ri+0.5);
+      for(let j=0;j<r.arr.length;j++){
+        const px=xs.getPixelForValue(r.arr[j]);
+        if(px<ca.left-3||px>ca.right+3) continue;
+        const hsh=((j*2654435761)>>>0)%1000/1000;     // deterministic jitter within the row band
+        const py=cy+(hsh-0.5)*band*0.66;
+        let fillA=0.18, strokeA=0.9, rad=2.3;
+        if(sel){
+          if(r.key===sel.key && r.arr[j]>=sel.lo && r.arr[j]<=sel.hi){ fillA=0.55; strokeA=1; rad=4.3; }
+          else if(r.key!==sel.key && sel.ends.has(r.years[j])){ fillA=0.50; strokeA=1; rad=3.4; }
+          else { fillA=0.05; strokeA=0.12; rad=2; }
+        }
+        ctx.beginPath(); ctx.arc(px,py,rad,0,6.2832);
+        ctx.fillStyle=r.color+wtHex(fillA); ctx.fill();
+        ctx.lineWidth=(sel&&rad>=3.4)?1.5:1; ctx.strokeStyle=r.color+wtHex(strokeA); ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+};
+// a row is "kept dark" if it's the dragged asset, or it has at least one same-period window
+function rowActive(r){ if(!wtSel) return true; if(r.key===wtSel.key) return true; return r.years.some(y=>wtSel.ends.has(y)); }
+function applyWtStyling(){
+  if(!rrChart||!rrRows.length) return;
+  const ds=rrChart.data.datasets[0];
+  ds.backgroundColor=rrRows.map(r=>r.color+(rowActive(r)?'2e':'0d'));
+  ds.borderColor=rrRows.map(r=>rowActive(r)?r.color:r.color+'33');
+  rrChart.update('none');
+}
+// volatility "along the way" = stdev (sample) of the annual returns experienced inside the window
+function wtComputeVol(key,endYear,N,B){
+  const a=RR.annual&&RR.annual[B]&&RR.annual[B][key]; if(!a) return null;
+  const start=endYear-N+1, vals=[];
+  a.years.forEach((y,i)=>{ if(y>=start&&y<=endYear) vals.push(a.rets[i]); });
+  if(vals.length<2) return null;
+  const m=vals.reduce((s,v)=>s+v,0)/vals.length;
+  const varc=vals.reduce((s,v)=>s+(v-m)*(v-m),0)/(vals.length-1);
+  return {vol:Math.sqrt(varc), n:vals.length};
+}
+function syncWhatThen(){
+  const p=document.getElementById('rrWhatThen'); if(!p) return;
+  p.style.display=state.whatThen?'block':'none';   // base CSS is display:none, so '' would fall back to hidden
+  if(state.whatThen) renderWhatThenPanel();
+}
+function renderWhatThenPanel(){
+  const p=document.getElementById('rrWhatThen'); if(!p) return;
+  const N=parseInt(state.horizon), B=state.basis, bLab=B==='real'?'real':'nominal';
+  if(!wtSel){
+    p.innerHTML='<h3>What then?</h3><div class="wtinstr">Drag horizontally across <b>one asset’s row</b> to pick a band of '
+      +N+'y '+bLab+' annualised returns (e.g. S&amp;P 5%–6%).<br><br>You’ll get every window inside that band — its '
+      +'period, annualised return and the <b>volatility along the way</b> — and the chart dims every other dot except the '
+      +'<b>same-period</b> windows for the other assets.</div>';
+    return;
+  }
+  const wins=[...wtSel.wins].sort((a,b)=>a.end-b.end);
+  let h='<h3>'+wtSel.label+'</h3>';
+  h+='<div class="wtmeta">'+pct1(wtSel.lo)+' to '+pct1(wtSel.hi)+' · '+N+'y '+bLab+' annualised · <b>'+wins.length+' window'+(wins.length===1?'':'s')+'</b><br>'
+     +'Same-period windows for other assets stay dark; the rest are dimmed.</div>';
+  if(!wins.length){ h+='<div class="wtinstr">No '+wtSel.label+' windows fall in that band — try a wider drag.</div>'; }
+  else{
+    h+='<table><thead><tr><th>Window</th><th>Ann.</th><th>Vol</th></tr></thead><tbody>';
+    wins.forEach(w=>{ const v=wtComputeVol(wtSel.key,w.end,N,B);
+      const volTxt=v?(v.vol.toFixed(1)+'%'+(v.n<N?'<span class="warn" title="only '+v.n+' annual obs inside this window">*</span>':'')):'—';
+      h+='<tr><td>'+(w.end-N)+'–'+w.end+'</td><td class="v">'+pct1(w.ret)+'</td><td>'+volTxt+'</td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  h+='<button class="wtclear" onclick="wtClear()">Clear selection</button>';
+  p.innerHTML=h;
+}
+function wtClear(){ wtSel=null; applyWtStyling(); renderWhatThenPanel(); }
 
 // ---- tabs / state / url ----
 function applyState(){
@@ -539,11 +651,11 @@ async function boot(){
   document.querySelectorAll('#windowSeg button').forEach(b=>b.onclick=()=>{state.window=b.dataset.w;applyState();});
   document.querySelectorAll('#scaleSeg button').forEach(b=>b.onclick=()=>{state.scale=b.dataset.scale;applyState();});
   document.getElementById('metricSel').onchange=(e)=>{state.metric=e.target.value;applyState();};
-  document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{state.horizon=b.dataset.h;applyState();});
-  document.querySelectorAll('#basisSeg button, #basisSegC button').forEach(b=>b.onclick=()=>{state.basis=b.dataset.b;applyState();});
+  document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{wtSel=null;state.horizon=b.dataset.h;applyState();});
+  document.querySelectorAll('#basisSeg button, #basisSegC button').forEach(b=>b.onclick=()=>{wtSel=null;state.basis=b.dataset.b;applyState();});
   const wireSlider=(mnId,mxId)=>{
     const mn=document.getElementById(mnId), mx=document.getElementById(mxId); if(!mn||!mx) return;
-    const onSlide=()=>{ let a=+mn.value,b=+mx.value;
+    const onSlide=()=>{ wtSel=null; let a=+mn.value,b=+mx.value;
       // keep the handles ≥ MINSPAN years apart, so every horizon always has windows
       if(document.activeElement===mn){ if(a>b-MINSPAN) a=Math.max(YMIN,b-MINSPAN); }
       else { if(b<a+MINSPAN) b=Math.min(YMAX,a+MINSPAN); }
@@ -554,6 +666,47 @@ async function boot(){
     mn.addEventListener('input',onSlide); mx.addEventListener('input',onSlide);
   };
   wireSlider('yrMin','yrMax'); wireSlider('cyrMin','cyrMax');
+
+  // ---- "What then?" explorer wiring ----
+  const wtBtn=document.getElementById('wtBtn');
+  if(wtBtn) wtBtn.onclick=()=>{
+    state.whatThen=!state.whatThen;
+    wtBtn.classList.toggle('on',state.whatThen);
+    document.getElementById('rrCanvas').style.cursor=state.whatThen?'crosshair':'';
+    if(!state.whatThen){ wtSel=null; applyWtStyling(); }
+    syncWhatThen();
+  };
+  (function wireWtDrag(){
+    const cv=document.getElementById('rrCanvas'); if(!cv) return;
+    const box=document.getElementById('rrSelBox');
+    let d=null;
+    cv.addEventListener('mousedown',e=>{
+      if(!state.whatThen||!rrChart||!rrRows.length) return;
+      e.preventDefault();
+      const rect=cv.getBoundingClientRect(), ca=rrChart.chartArea;
+      const band=(ca.bottom-ca.top)/rrRows.length;
+      const x0=e.clientX-rect.left, y0=e.clientY-rect.top;
+      let ri=Math.floor((y0-ca.top)/band); ri=Math.max(0,Math.min(rrRows.length-1,ri));
+      d={x0,ri,top:ca.top+band*ri,h:band};
+      box.style.display='block'; box.style.top=d.top+'px'; box.style.height=d.h+'px';
+      box.style.left=x0+'px'; box.style.width='0px';
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!d) return; const x=e.clientX-cv.getBoundingClientRect().left;
+      box.style.left=Math.min(d.x0,x)+'px'; box.style.width=Math.abs(x-d.x0)+'px';
+    });
+    window.addEventListener('mouseup',e=>{
+      if(!d) return; const x=e.clientX-cv.getBoundingClientRect().left, drag=d; d=null; box.style.display='none';
+      if(Math.abs(x-drag.x0)<5){ wtSel=null; applyWtStyling(); renderWhatThenPanel(); return; }
+      const xs=rrChart.scales.x;
+      const lo=xs.getValueForPixel(Math.min(drag.x0,x)), hi=xs.getValueForPixel(Math.max(drag.x0,x));
+      const r=rrRows[drag.ri]; if(!r) return;
+      const ends=new Set(), wins=[];
+      r.arr.forEach((v,j)=>{ if(v>=lo&&v<=hi){ ends.add(r.years[j]); wins.push({end:r.years[j],ret:v}); } });
+      wtSel={key:r.key,label:r.label,color:r.color,lo,hi,ends,wins};
+      applyWtStyling(); renderWhatThenPanel();
+    });
+  })();
 }
 boot();
 
