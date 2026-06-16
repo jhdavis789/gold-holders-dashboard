@@ -507,7 +507,7 @@ function renderReturns(){
   }
   const indep = Math.max(1, Math.round((hi-lo+1)/N));
   document.getElementById('rrFoot').innerHTML =
-    '<b>Method:</b> '+RR.meta.method+' Each box plots every overlapping '+H+'y window; whiskers = Tukey fence, dots = individual windows.'
+    '<b>Method:</b> '+RR.meta.method+' Each box plots every overlapping '+H+'y window; whiskers = Tukey fence, dots = individual windows (stacked within each row by time — oldest window at top, newest at bottom).'
     +'<br><b>Read with care:</b> overlapping windows are highly autocorrelated — '+H+'y over '+lo+'–'+hi+' gives many windows but only ~'+indep+' <i>independent</i> ones. '
     +'The box shows the <i>historical spread</i> of past windows, not a forward confidence interval. Drag the <b>Period</b> handles to clip the sample to any sub-era. '
     +'<b>Gold pre-1971</b> was an administered peg, not a market price (US: $20.67/oz to 1933, $35 to 1968; the 1934 +69% step is the Gold Reserve Act devaluation, US private ownership illegal 1933–74) — pre-1971 gold windows reflect the peg + inflation, not an investable return. '
@@ -536,11 +536,12 @@ const wtDots={
     ctx.save();
     rrRows.forEach((r,ri)=>{
       const cy=ca.top+band*(ri+0.5);
+      const yrs=r.years, y0=yrs[0], yspan=(yrs[yrs.length-1]-y0)||1;   // vertical = time, per lane
       for(let j=0;j<r.arr.length;j++){
         const px=xs.getPixelForValue(r.arr[j]);
         if(px<ca.left-3||px>ca.right+3) continue;
-        const hsh=((j*2654435761)>>>0)%1000/1000;     // deterministic jitter within the row band
-        const py=cy+(hsh-0.5)*band*0.66;
+        // vertical position encodes the window's end year: oldest at top, newest at bottom
+        const py=cy+((yrs[j]-y0)/yspan-0.5)*band*0.84;
         let fillA=0.18, strokeA=0.9, rad=2.3;
         if(sel){
           if(r.key===sel.key && r.arr[j]>=sel.lo && r.arr[j]<=sel.hi){ fillA=0.55; strokeA=1; rad=4.3; }
