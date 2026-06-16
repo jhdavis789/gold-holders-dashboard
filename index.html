@@ -616,6 +616,15 @@ function renderWhatThenPanel(){
 }
 function wtClear(){ wtSel=null; applyWtStyling(); renderWhatThenPanel(); }
 
+// ---- Wealth-share iframe: it loads while the tab is hidden (scrollHeight≈0), so resize it to its
+//      content and nudge its charts to reflow each time the tab is shown.
+function sizeWealthFrame(){
+  const f=document.getElementById('wsFrame'); if(!f) return;
+  const fix=()=>{ try{ f.contentWindow.dispatchEvent(new Event('resize'));
+                       f.style.height=(f.contentWindow.document.body.scrollHeight+48)+'px'; }catch(e){} };
+  requestAnimationFrame(fix); setTimeout(fix,150);
+}
+
 // ---- tabs / state / url ----
 function applyState(){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===state.tab));
@@ -624,6 +633,7 @@ function applyState(){
   document.getElementById('returns').style.display = state.tab==='returns'?'':'none';
   document.getElementById('corr').style.display = state.tab==='corr'?'':'none';
   document.getElementById('wealth').style.display = state.tab==='wealth'?'':'none';
+  if(state.tab==='wealth') sizeWealthFrame();   // iframe loaded hidden -> recompute height + resize charts now
   document.querySelectorAll('#sectorSeg button').forEach(b=>b.classList.toggle('on',b.dataset.sector===state.sector));
   document.querySelectorAll('#windowSeg button').forEach(b=>b.classList.toggle('on',b.dataset.w===state.window));
   document.querySelectorAll('#scaleSeg button').forEach(b=>b.classList.toggle('on',b.dataset.scale===state.scale));
