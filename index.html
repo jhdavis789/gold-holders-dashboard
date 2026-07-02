@@ -672,6 +672,35 @@ const hlDots={
   }
 };
 
+// ---- "What then?" period bands drawn on the TIMELINE: each selected window shaded as a translucent
+//      rectangle in a strip along the bottom (between the x-axis and the data); overlaps accumulate. ----
+const wtBands={
+  id:'wtBands',
+  beforeDatasetsDraw(chart){
+    if(!wtSel||!wtSel.wins||!wtSel.wins.length||!MONTHLY) return;
+    const xs=chart.scales.x, ca=chart.chartArea; if(!xs||!ca) return;
+    const ctx=chart.ctx, base=+MONTHLY.dates[0].slice(0,4), NL=MONTHLY.dates.length;
+    const y2i=fy=>{ const y=Math.floor(fy); let m=Math.round((fy-y)*12)+1; if(m<1)m=1; if(m>12)m=12;
+      return Math.max(0,Math.min(NL-1,(y-base)*12+(m-1))); };   // grid is contiguous monthly from `base`
+    const spanM = selWin ? selWin.Tm : parseInt(state.horizon)*12;   // window length: custom Tm months, else N years
+    const bandH=Math.min(36,(ca.bottom-ca.top)*0.30), y0=ca.bottom-bandH;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(ca.left,ca.top,ca.right-ca.left,ca.bottom-ca.top); ctx.clip();
+    ctx.fillStyle=wtSel.color+'26';                             // translucent → overlaid periods read darker
+    wtSel.wins.forEach(w=>{
+      const ei=y2i(w.end), si=Math.max(0,ei-spanM);
+      let xa=xs.getPixelForValue(si), xb=xs.getPixelForValue(ei);
+      if(!isFinite(xa)||!isFinite(xb)||xb<ca.left||xa>ca.right) return;
+      xa=Math.max(ca.left,xa); xb=Math.min(ca.right,xb);
+      ctx.fillRect(xa,y0,Math.max(1.5,xb-xa),bandH);
+    });
+    ctx.strokeStyle=wtSel.color+'66'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(ca.left,y0); ctx.lineTo(ca.right,y0); ctx.stroke();   // top edge of the strip
+    ctx.restore();
+  }
+};
+function refreshTlBands(){ if(tlChart) tlChart.update('none'); }   // repaint the timeline so wtBands re-runs
+
 // ---- custom-window box-and-whisker: recompute every Tm-month rolling window from the level series ----
 function cstats(arr){
   if(!arr.length) return null;
@@ -808,7 +837,7 @@ function drawTimeline(){
     const a=rrAsset(tlAsset);
     if(tlChart){ tlChart.destroy(); tlChart=null; }
     const ctx=cvEl.getContext('2d');
-    tlChart=new Chart(ctx,{type:'line',
+    tlChart=new Chart(ctx,{type:'line',plugins:[wtBands],
       data:{labels:dates,datasets:[{label:a.label,data:L,borderColor:a.color,backgroundColor:a.color+'14',
         fill:true,borderWidth:1.8,tension:0,pointRadius:0,pointHoverRadius:3,spanGaps:true}]},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
@@ -816,7 +845,7 @@ function drawTimeline(){
           tooltip:{mode:'index',intersect:false,callbacks:{title:it=>dates[it[0].dataIndex],
             label:c=>a.label+' = '+(c.parsed.y==null?'—':c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:1}))}}},
         scales:{
-          x:{type:'category',min:dates[i0],max:dates[i1],
+          x:{type:'category',min:(''+state.yMin+'-01'),max:(''+state.yMax+'-12'),   // match the top Period draggers
              ticks:{color:'#5e6b7e',maxTicksLimit:12,autoSkip:true,
                callback(v){ const d=this.getLabelForValue(v); return d?d.slice(0,4):d; }},
              grid:{color:'#e2e8f1'}},
@@ -836,6 +865,12 @@ function updateBand(){
   const l=Math.max(ca.left,Math.min(pxA,pxB)), r=Math.min(ca.right,Math.max(pxA,pxB));
   band.style.display='block'; band.style.left=l+'px'; band.style.width=Math.max(2,r-l)+'px';
 }
+function updateTlRange(){   // re-range the timeline x-axis to the Period draggers, in place (no rebuild)
+  if(!tlChart) return;
+  tlChart.options.scales.x.min=(''+state.yMin+'-01');
+  tlChart.options.scales.x.max=(''+state.yMax+'-12');
+  tlChart.update('none'); updateBand();
+}
 function updateSelInfo(){
   const el=document.getElementById('tlSelInfo'), clr=document.getElementById('tlClear'), hint=document.getElementById('tlHint');
   if(!el) return;
@@ -854,6 +889,7 @@ function applyWtStyling(){
   ds.backgroundColor=rrRows.map(r=>r.color+(rowActive(r)?'2e':'0d'));
   ds.borderColor=rrRows.map(r=>rowActive(r)?r.color:r.color+'33');
   rrChart.update('none');
+  refreshTlBands();          // keep the timeline's "What then?" period bands in sync with the selection
 }
 // volatility "along the way" = stdev (sample) of the annual returns experienced inside the window
 function wtComputeVol(key,endYear,N,B){
@@ -883,7 +919,8 @@ function renderWhatThenPanel(){
   const wins=[...wtSel.wins].sort((a,b)=>a.end-b.end);
   let h='<h3>'+wtSel.label+'</h3>';
   h+='<div class="wtmeta">'+pct1(wtSel.lo)+' to '+pct1(wtSel.hi)+' · '+N+'y '+bLab+' annualised · <b>'+wins.length+' window'+(wins.length===1?'':'s')+'</b><br>'
-     +'Same-period windows for other assets stay dark; the rest are dimmed.</div>';
+     +'Same-period windows for other assets stay dark; the rest are dimmed. '
+     +'Each window’s date range is shaded on the timeline below.</div>';
   if(!wins.length){ h+='<div class="wtinstr">No '+wtSel.label+' windows fall in that band — try a wider drag.</div>'; }
   else{
     h+='<table><thead><tr><th>Window</th><th>Ann.</th><th>Vol</th></tr></thead><tbody>';
@@ -956,7 +993,7 @@ async function boot(){
   document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{wtSel=null;selWin=null;rrHL=null;updateBand();updateSelInfo();state.horizon=b.dataset.h;applyState();});
   document.querySelectorAll('#basisSeg button, #basisSegC button').forEach(b=>b.onclick=()=>{wtSel=null;state.basis=b.dataset.b;applyState();});
   document.querySelectorAll('#stepSeg button').forEach(b=>b.onclick=()=>{
-    const s=b.dataset.s; wtSel=null;
+    const s=b.dataset.s; wtSel=null; refreshTlBands();
     if(s==='monthly' && !MONTHLY){                       // lazy-load the monthly dataset on first use
       document.querySelectorAll('#stepSeg button').forEach(x=>x.classList.toggle('on',x.dataset.s==='monthly'));
       document.getElementById('rrNote').textContent='Loading monthly data…';
@@ -974,7 +1011,7 @@ async function boot(){
       else { if(b<a+MINSPAN) b=Math.min(YMAX,a+MINSPAN); }
       if(b-a<MINSPAN){ b=Math.min(YMAX,a+MINSPAN); a=Math.max(YMIN,b-MINSPAN); }
       state.yMin=a; state.yMax=b;
-      if(state.tab==='corr') renderCorr(); else renderReturns();
+      if(state.tab==='corr') renderCorr(); else { renderReturns(); updateTlRange(); }
       const q=new URLSearchParams(location.search); q.set('from',a); q.set('to',b); history.replaceState(null,'','?'+q.toString()); };
     mn.addEventListener('input',onSlide); mx.addEventListener('input',onSlide);
   };
@@ -992,7 +1029,7 @@ async function boot(){
       if(cb.checked) extraSeries.add(cb.dataset.k); else extraSeries.delete(cb.dataset.k);
       eb.classList.toggle('on', extraSeries.size>0);
       if(wtSel) wtSel=null;                 // selection windows change when the row set changes
-      renderReturns();
+      renderReturns(); refreshTlBands();
     });
     document.addEventListener('click',(e)=>{ if(!em.contains(e.target)&&e.target!==eb) em.classList.remove('on'); });
   })();
