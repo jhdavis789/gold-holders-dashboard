@@ -48,6 +48,16 @@
   .seg button.on{background:linear-gradient(90deg,var(--gold2),var(--amber));color:var(--bg);}
   select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-weight:600;}
   label.lbl{color:var(--muted);font-size:13px;font-weight:600;margin-right:4px;}
+  /* --- timeline: drag a period on one asset's log-level line; boxes above recompute + highlight it --- */
+  #rrTimeline{margin-top:20px;border-top:1px dashed var(--line);padding-top:16px;}
+  .tlctrls{margin-bottom:8px;gap:12px;}
+  #tlAsset{max-width:250px;}
+  .tlhint{max-width:560px;margin:0;}
+  .tlselinfo{font-size:12.5px;color:var(--ink);font-weight:600;}
+  .tlselinfo b{color:var(--gold2);}
+  #tlWrap{cursor:crosshair;user-select:none;-webkit-user-select:none;}
+  #tlBand{position:absolute;top:0;bottom:18px;background:rgba(10,79,147,.13);
+    border-left:2px solid var(--gold2);border-right:2px solid var(--gold2);pointer-events:none;display:none;z-index:2;}
   .rangewrap{position:relative;display:inline-block;width:230px;height:22px;vertical-align:middle;margin:0 8px;}
   .rangewrap .rtrack{position:absolute;left:0;right:0;top:9px;height:4px;background:var(--line);border-radius:2px;}
   .rangewrap .rfill{position:absolute;top:9px;height:4px;background:var(--gold2);border-radius:2px;}
@@ -194,6 +204,21 @@
         <div id="rrWrap" style="position:relative;flex:1;min-width:0;height:560px"><canvas id="rrCanvas"></canvas><div id="rrSelBox"></div></div>
         <div id="rrWhatThen"></div>
       </div>
+
+      <!-- TIMELINE — drag a period on one asset's log-level line; the boxes above recompute to that
+           exact window length across every asset and ring the selected window in each. -->
+      <div id="rrTimeline">
+        <div class="controls tlctrls">
+          <span><label class="lbl">Timeline</label>
+            <select id="tlAsset" title="Which series to draw. Drag across the chart to pick a period."></select></span>
+          <span class="note tlhint" id="tlHint">Click-drag across the chart to pick a period &mdash; the boxes above recompute to windows of that exact length and ring your selected window (a &#9679; per asset).</span>
+          <span class="tlselinfo" id="tlSelInfo" style="display:none"></span>
+          <button id="tlClear" class="wtbtn" style="display:none">&#8634; Clear window</button>
+        </div>
+        <div id="tlWrap" style="position:relative;height:240px"><canvas id="tlCanvas"></canvas><div id="tlBand"></div></div>
+        <div class="foot" id="tlFoot"></div>
+      </div>
+
       <div id="rrTable" style="margin-top:16px"></div>
       <div class="foot" id="rrFoot"></div>
     </div>
@@ -257,6 +282,12 @@ const NAMEFIX = {'China, P.R.: Mainland':'China','Russian Federation':'Russia',
 const fixName = n => NAMEFIX[n]||n;
 
 let DATA=null, TS=null, RR=null, MONTHLY=null, state={tab:'snapshot',sector:'central_banks',metric:'tonnes',window:'20y',scale:'independent',horizon:'20',basis:'real',yMin:1901,yMax:2025,whatThen:false,step:'annual'};
+// ---- timeline / drag-to-select-a-window state ----
+// LVL = MONTHLY.levels (per-asset monthly total-return level index, base 100, nominal & real).
+// selWin = {i,j,Tm} : dragged start/end month indices into MONTHLY.dates + window length in months.
+// When selWin is set the box-and-whisker recomputes to every Tm-month rolling window per asset and
+// rrHL rings the selected window's return in each row.
+let tlChart=null, LVL=null, tlAsset='us_equity', selWin=null, rrHL=null;
 
 // boxplot plugin auto-registers when loaded as a script tag; register defensively too.
 if(typeof ChartBoxPlot!=='undefined' && typeof Chart!=='undefined' && Chart.register){
@@ -462,8 +493,13 @@ function renderCorr(){
   document.getElementById('corrFoot').innerHTML='<b>Pearson correlation of annual '+(B==='real'?'real (CPI-adj.)':'nominal')+' total returns.</b> Each pair uses its overlapping years within the selected Period; cells with &lt;5 overlapping years show "·". Blue = positive, magenta = negative co-movement; intensity = strength. Same sources as the Rolling-returns tab (see its footnote / <code>SOURCES.md</code>).';
 }
 
-function renderReturns(){
+function renderReturns(){   // dispatcher: timeline-drag custom window vs fixed 1/5/10/20y horizon
+  if(selWin && LVL) return renderReturnsCustom();
+  return renderReturnsFixed();
+}
+function renderReturnsFixed(){
   if(!RR) return;
+  rrHL=null;
   if(rrChart){ rrChart.destroy(); rrChart=null; }
   const H=state.horizon, B=state.basis, N=parseInt(H), lo=+state.yMin, hi=+state.yMax;
   const SRCDATA=(state.step==='monthly'&&MONTHLY)?MONTHLY.data:RR.data;   // monthly is lazy-loaded
@@ -510,7 +546,7 @@ function renderReturns(){
     const ctx=document.getElementById('rrCanvas').getContext('2d');
     rrChart=new Chart(ctx,{
       type:'boxplot',
-      plugins:[wtDots],
+      plugins:[wtDots,hlDots],
       data:{labels:rows.map(r=>r.label+(r.annual_only?' *':'')+'  ('+Math.floor(r.years[0]-N)+'–)'),datasets:[{
         label:H+'y annualised return',
         data:rows.map(r=>r.arr.map(rrToX)),
@@ -615,6 +651,201 @@ const wtDots={
     ctx.restore();
   }
 };
+
+// ---- highlighted selected-window marker: one ● per asset at its dragged-window return ----
+const hlDots={
+  id:'hlDots',
+  afterDatasetsDraw(chart){
+    if(!rrHL||!rrRows.length) return;
+    const xs=chart.scales.x, ca=chart.chartArea; if(!xs||!ca) return;
+    const ctx=chart.ctx, band=(ca.bottom-ca.top)/rrRows.length;
+    ctx.save();
+    rrRows.forEach((r,ri)=>{
+      const ret=rrHL[r.key]; if(ret==null) return;
+      const px=xs.getPixelForValue(rrToX(ret)); if(px<ca.left-4||px>ca.right+4) return;
+      const cy=ca.top+band*(ri+0.5);
+      ctx.beginPath(); ctx.arc(px,cy,7.6,0,6.2832); ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fill();  // halo so it reads over the dot cloud
+      ctx.beginPath(); ctx.arc(px,cy,6,0,6.2832); ctx.fillStyle=r.color; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle='#13294b'; ctx.stroke();
+    });
+    ctx.restore();
+  }
+};
+
+// ---- custom-window box-and-whisker: recompute every Tm-month rolling window from the level series ----
+function cstats(arr){
+  if(!arr.length) return null;
+  const s=[...arr].sort((a,b)=>a-b);
+  return {n:arr.length,min:s[0],q1:quantile(s,.25),median:quantile(s,.5),q3:quantile(s,.75),
+          max:s[s.length-1],pct_negative:arr.filter(x=>x<0).length/arr.length*100};
+}
+function renderReturnsCustom(){
+  if(rrChart){ rrChart.destroy(); rrChart=null; }
+  const B=state.basis, lo=+state.yMin, hi=+state.yMax, Tm=selWin.Tm;
+  const dates=MONTHLY.dates, lvB=LVL[B];
+  const dfrac=d=>{ const y=+d.slice(0,4), m=+d.slice(5,7); return y+(m-1)/12; };
+  const wLab = Tm%12===0 ? (Tm/12)+'y' : Tm+'mo';
+  const bLab = B==='real' ? 'real (CPI-adjusted)' : 'nominal';
+  const winStr = dates[selWin.i]+' → '+dates[selWin.j];
+  document.querySelectorAll('#horizonSeg button').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#basisSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===B));
+
+  const rows=[];
+  renderOrder().forEach(k=>{
+    const L=lvB[k]; if(!L) return;
+    const arr=[], yy=[];
+    for(let s=0;s+Tm<L.length;s++){
+      const L0=L[s], L1=L[s+Tm];
+      if(L0==null||L1==null||L0<=0||L1<=0) continue;
+      const sy=dfrac(dates[s]), ey=dfrac(dates[s+Tm]);
+      if(sy<lo-1e-9||ey>hi+1+1e-9) continue;               // honour the Period slider (window inside [lo,hi])
+      arr.push(((L1/L0)**(12/Tm)-1)*100); yy.push(ey);
+    }
+    if(!arr.length) return;
+    const a=rrAsset(k);
+    const s0=L[selWin.i], s1=L[selWin.j], ok=(s0!=null&&s1!=null&&s0>0&&s1>0);
+    rows.push({key:k,label:a.label,color:a.color,source:a.source,annual_only:a.annual_only,
+      arr,years:yy,stats:cstats(arr),
+      hl: ok?((s1/s0)**(12/Tm)-1)*100:null,
+      hlTot: ok?(s1/s0-1)*100:null});
+  });
+  rrRows=rows; rrHL={}; rows.forEach(r=>{ rrHL[r.key]=r.hl; });
+
+  document.getElementById('rrWrap').style.height = Math.max(200, rows.length*46+110)+'px';
+  if(!rows.length){
+    document.getElementById('rrTable').innerHTML='<p class="note">No '+wLab+' windows fit the current Period ('+lo+'–'+hi+'). Widen the Period, or pick a shorter window.</p>';
+    document.getElementById('rrNote').textContent='Custom '+wLab+' window · '+winStr+' · 0 windows in period';
+    document.getElementById('rrFoot').innerHTML='';
+    return;
+  }
+  const logMode = rows.some(r=>r.key==='btc');
+  rrToX   = logMode ? (v=>1+v/100) : (v=>v);
+  rrFromX = logMode ? (x=>(x-1)*100) : (x=>x);
+  const fmtPct = v => (v>=0?'+':'')+(Math.abs(v)>=100?v.toFixed(0):v.toFixed(1))+'%';
+  let logMin=0.1,logMax=10,logTicks=[];
+  if(logMode){
+    const allX=rows.flatMap(r=>r.arr.map(rrToX)); logMin=Math.min(...allX); logMax=Math.max(...allX);
+    const PADL=.93,PADH=1.07, cand=[-90,-75,-50,-25,0,25,50,100,200,300,500,1000,2000,5000].map(p=>1+p/100);
+    logTicks=cand.filter(m=>m>=logMin*PADL&&m<=logMax*PADH); logMin*=PADL; logMax*=PADH;
+  }
+  const ctx=document.getElementById('rrCanvas').getContext('2d');
+  rrChart=new Chart(ctx,{
+    type:'boxplot', plugins:[wtDots,hlDots],
+    data:{labels:rows.map(r=>r.label+(r.annual_only?' *':'')),datasets:[{
+      label:wLab+' annualised return',
+      data:rows.map(r=>r.arr.map(rrToX)),
+      backgroundColor:rows.map(r=>r.color+'2e'), borderColor:rows.map(r=>r.color), borderWidth:1.6,
+      itemRadius:0, itemStyle:'circle', itemHitRadius:3,
+      itemBackgroundColor:rows.map(r=>r.color+'2e'), itemBorderColor:rows.map(r=>r.color),
+      outlierRadius:0, meanRadius:0, medianColor:'#13294b', padding:14
+    }]},
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{title:(it)=>rows[it[0].dataIndex].label,
+          beforeLabel:()=>undefined,
+          afterBody:(it)=>{ const r=rows[it[0].dataIndex], s=r.stats;
+            return ['n = '+s.n+' overlapping '+wLab+' windows',
+                    'min '+pct1(s.min)+'   median '+pct1(s.median)+'   max '+pct1(s.max),
+                    '% windows below 0: '+s.pct_negative.toFixed(0)+'%',
+                    'SELECTED '+winStr+': '+(r.hl==null?'n/a':pct1(r.hl)+'/yr  ('+pct1(r.hlTot)+' total)')]; }}}},
+      scales:{
+        x:logMode?{
+           type:'logarithmic', min:logMin, max:logMax,
+           title:{display:true,text:wLab+' '+bLab+' annualised return — LOG scale (Bitcoin shown)',color:'#5e6b7e'},
+           afterBuildTicks:s=>{ s.ticks=logTicks.map(v=>({value:v})); },
+           ticks:{color:'#5e6b7e',autoSkip:false,callback:v=>fmtPct((v-1)*100)},
+           grid:{color:c=>c.tick.value===1?'#13294b':'#e2e8f1', lineWidth:c=>c.tick.value===1?1.6:1}}
+        :{title:{display:true,text:wLab+' '+bLab+' annualised return (%) — ● = your selected window',color:'#5e6b7e'},
+           ticks:{color:'#5e6b7e',callback:v=>v+'%'},
+           grid:{color:c=>c.tick.value===0?'#13294b':'#e2e8f1', lineWidth:c=>c.tick.value===0?1.6:1}},
+        y:{ticks:{color:'#13294b',font:{weight:'600'}},grid:{display:false}}
+      }
+    }
+  });
+  // table — sorted by the SELECTED window's return, directly answering "how did each asset do then"
+  let h='<table><thead><tr><th>Asset</th><th>Windows (n)</th><th>Min</th><th>Q1</th>'
+       +'<th>Median</th><th>Q3</th><th>Max</th><th>% &lt; 0</th><th title="'+winStr+', annualised (total in chart tooltip)">Selected '+winStr+'</th></tr></thead><tbody>';
+  rows.slice().sort((a,b)=>((b.hl==null?-1e9:b.hl)-(a.hl==null?-1e9:a.hl))).forEach(r=>{ const s=r.stats;
+    h+=`<tr><td><span class="cite" title="${(r.source||'').replace(/"/g,'&quot;')}">`
+      +`<span style="color:${r.color};font-weight:700">●</span> ${r.label}</span></td>`
+      +`<td>${s.n}</td><td>${pct1(s.min)}</td><td>${pct1(s.q1)}</td>`
+      +`<td class="v">${pct1(s.median)}</td><td>${pct1(s.q3)}</td><td>${pct1(s.max)}</td>`
+      +`<td>${s.pct_negative.toFixed(0)}%</td>`
+      +`<td class="v" title="${r.hl==null?'':pct1(r.hlTot)+' total return over '+winStr}">${r.hl==null?'—':pct1(r.hl)+'/yr'}</td></tr>`;
+  });
+  h+='</tbody></table>';
+  document.getElementById('rrTable').innerHTML=h;
+  document.getElementById('rrNote').textContent =
+    'Custom '+wLab+' window (monthly step) · '+bLab+' · selected '+winStr+' · '+rows.length+' assets · Period '+lo+'–'+hi;
+  document.getElementById('rrFoot').innerHTML =
+    '<b>Timeline mode.</b> Each box is the distribution of every overlapping <b>'+wLab+'</b> window (monthly step) for that asset, annualised; the large '
+    +'<b>●</b> marks your dragged window <b>'+winStr+'</b>. Levels are total-return indices rebased to 100 at each series’ start (return-neutral). '
+    +'Sub-year windows are <i>annualised</i> — a big multiplier on short spans, so read the total-return figure (chart tooltip / column title) alongside it. '
+    +'Gold &amp; housing deep history is monthly-interpolated from annual averages (starred *). Drag a new period to update, or <b>Clear window</b> to return to the fixed 1/5/10/20y horizons.';
+}
+
+// ---- timeline: draggable log-level line that defines the custom window ----
+function ensureMonthly(cb){
+  if(MONTHLY){ if(!LVL) LVL=MONTHLY.levels; cb&&cb(); return; }
+  const f=document.getElementById('tlFoot'); if(f) f.textContent='Loading timeline data…';
+  fetch('returns_dist_monthly.json').then(r=>r.json()).then(j=>{ MONTHLY=j; LVL=j.levels; if(f) f.textContent=''; cb&&cb(); })
+    .catch(()=>{ if(f) f.textContent='Timeline data unavailable (needs returns_dist_monthly.json).'; });
+}
+function buildTlAssetSel(){
+  const sel=document.getElementById('tlAsset'); if(!sel||!RR) return;
+  if(!RR.assets.some(a=>a.key===tlAsset)) tlAsset='us_equity';
+  sel.innerHTML=RR.assets.map(a=>`<option value="${a.key}"${a.key===tlAsset?' selected':''}>${a.label}${a.secondary?' (secondary)':''}</option>`).join('');
+  sel.onchange=()=>{ tlAsset=sel.value; drawTimeline(); };
+}
+function drawTimeline(){
+  if(state.tab!=='returns') return;
+  ensureMonthly(()=>{
+    const B=state.basis, dates=MONTHLY.dates, L=LVL[B][tlAsset];
+    const cvEl=document.getElementById('tlCanvas'); if(!L||!cvEl) return;
+    let i0=0; while(i0<L.length&&L[i0]==null) i0++;
+    let i1=L.length-1; while(i1>0&&L[i1]==null) i1--;
+    const a=rrAsset(tlAsset);
+    if(tlChart){ tlChart.destroy(); tlChart=null; }
+    const ctx=cvEl.getContext('2d');
+    tlChart=new Chart(ctx,{type:'line',
+      data:{labels:dates,datasets:[{label:a.label,data:L,borderColor:a.color,backgroundColor:a.color+'14',
+        fill:true,borderWidth:1.8,tension:0,pointRadius:0,pointHoverRadius:3,spanGaps:true}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{legend:{display:false},
+          tooltip:{mode:'index',intersect:false,callbacks:{title:it=>dates[it[0].dataIndex],
+            label:c=>a.label+' = '+(c.parsed.y==null?'—':c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:1}))}}},
+        scales:{
+          x:{type:'category',min:dates[i0],max:dates[i1],
+             ticks:{color:'#5e6b7e',maxTicksLimit:12,autoSkip:true,
+               callback(v){ const d=this.getLabelForValue(v); return d?d.slice(0,4):d; }},
+             grid:{color:'#e2e8f1'}},
+          y:{type:'logarithmic',
+             title:{display:true,text:a.label+' — growth of $100 ('+(B==='real'?'real':'nominal')+', log scale)',color:'#5e6b7e'},
+             ticks:{color:'#5e6b7e',callback:v=>{ const t=[1,3,10,30,100,300,1000,3000,10000,30000,100000,300000,1000000,3000000];
+               return t.indexOf(v)>=0?(v>=1000?(v/1000)+'k':''+v):''; }},
+             grid:{color:'#e2e8f1'}}}}});
+    updateBand();
+  });
+}
+function updateBand(){
+  const band=document.getElementById('tlBand');
+  if(!band||!tlChart||!selWin){ if(band) band.style.display='none'; return; }
+  const xs=tlChart.scales.x, ca=tlChart.chartArea; if(!xs||!ca){ band.style.display='none'; return; }
+  const pxA=xs.getPixelForValue(selWin.i), pxB=xs.getPixelForValue(selWin.j);
+  const l=Math.max(ca.left,Math.min(pxA,pxB)), r=Math.min(ca.right,Math.max(pxA,pxB));
+  band.style.display='block'; band.style.left=l+'px'; band.style.width=Math.max(2,r-l)+'px';
+}
+function updateSelInfo(){
+  const el=document.getElementById('tlSelInfo'), clr=document.getElementById('tlClear'), hint=document.getElementById('tlHint');
+  if(!el) return;
+  if(!selWin||selWin.Tm<1||!MONTHLY){ el.style.display='none'; if(clr) clr.style.display='none'; if(hint) hint.style.display=''; return; }
+  const dates=MONTHLY.dates, Tm=selWin.Tm, wLab=Tm%12===0?(Tm/12)+'y':Tm+'mo';
+  el.innerHTML='Window <b>'+dates[selWin.i]+' → '+dates[selWin.j]+'</b> ('+wLab+') — boxes show every '+wLab+' window; ● = this one';
+  el.style.display=''; if(clr) clr.style.display=''; if(hint) hint.style.display='none';
+}
+function tlClearSel(){ selWin=null; rrHL=null; updateBand(); updateSelInfo(); renderReturns(); }
+
 // a row is "kept dark" if it's the dragged asset, or it has at least one same-period window
 function rowActive(r){ if(!wtSel) return true; if(r.key===wtSel.key) return true; return r.years.some(y=>wtSel.ends.has(y)); }
 function applyWtStyling(){
@@ -690,7 +921,7 @@ function applyState(){
   document.querySelectorAll('#scaleSeg button').forEach(b=>b.classList.toggle('on',b.dataset.scale===state.scale));
   fillMetricSel();
   if(state.tab==='trends') renderTrends();
-  if(state.tab==='returns') renderReturns();
+  if(state.tab==='returns'){ renderReturns(); drawTimeline(); updateSelInfo(); }
   if(state.tab==='corr') renderCorr();
   const q=new URLSearchParams(); q.set('tab',state.tab);
   if(state.tab==='returns'){ q.set('horizon',state.horizon); q.set('basis',state.basis); q.set('from',state.yMin); q.set('to',state.yMax); }
@@ -722,7 +953,7 @@ async function boot(){
   document.querySelectorAll('#windowSeg button').forEach(b=>b.onclick=()=>{state.window=b.dataset.w;applyState();});
   document.querySelectorAll('#scaleSeg button').forEach(b=>b.onclick=()=>{state.scale=b.dataset.scale;applyState();});
   document.getElementById('metricSel').onchange=(e)=>{state.metric=e.target.value;applyState();};
-  document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{wtSel=null;state.horizon=b.dataset.h;applyState();});
+  document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{wtSel=null;selWin=null;rrHL=null;updateBand();updateSelInfo();state.horizon=b.dataset.h;applyState();});
   document.querySelectorAll('#basisSeg button, #basisSegC button').forEach(b=>b.onclick=()=>{wtSel=null;state.basis=b.dataset.b;applyState();});
   document.querySelectorAll('#stepSeg button').forEach(b=>b.onclick=()=>{
     const s=b.dataset.s; wtSel=null;
@@ -806,6 +1037,28 @@ async function boot(){
       applyWtStyling(); renderWhatThenPanel();
     });
   })();
+
+  // ---- timeline: asset dropdown + click-drag to define the custom window ----
+  buildTlAssetSel();
+  const tlClearBtn=document.getElementById('tlClear'); if(tlClearBtn) tlClearBtn.onclick=()=>tlClearSel();
+  (function wireTlDrag(){
+    const cv=document.getElementById('tlCanvas'); if(!cv) return;
+    const idxAt=clientX=>{ if(!tlChart) return 0;
+      const px=clientX-cv.getBoundingClientRect().left;
+      let idx=Math.round(tlChart.scales.x.getValueForPixel(px));
+      return Math.max(0,Math.min((MONTHLY?MONTHLY.dates.length:1)-1,idx)); };
+    let d=null;
+    cv.addEventListener('mousedown',e=>{ if(!tlChart||!LVL) return; e.preventDefault(); d={i0:idxAt(e.clientX)}; });
+    window.addEventListener('mousemove',e=>{ if(!d) return;
+      const i=idxAt(e.clientX); selWin={i:Math.min(d.i0,i),j:Math.max(d.i0,i),Tm:Math.abs(i-d.i0)};
+      updateBand(); updateSelInfo(); });                         // live band while dragging; recompute on release
+    window.addEventListener('mouseup',e=>{ if(!d) return; const i=idxAt(e.clientX), i0=d.i0; d=null;
+      const lo=Math.min(i0,i), hi=Math.max(i0,i);
+      if(hi-lo<1){ selWin=null; rrHL=null; updateBand(); updateSelInfo(); renderReturns(); return; }  // click w/o drag = clear
+      wtSel=null; selWin={i:lo,j:hi,Tm:hi-lo}; updateBand(); updateSelInfo(); renderReturns(); });
+  })();
+  // keep the selection band aligned when the chart responsively resizes
+  window.addEventListener('resize',()=>{ if(state.tab==='returns'){ updateBand(); setTimeout(updateBand,80); } });
 }
 boot();
 
