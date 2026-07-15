@@ -14,6 +14,7 @@
   h1{font-size:27px;margin:0 0 2px;letter-spacing:-.4px;font-weight:700;color:var(--gold2);}
   h2{font-size:18px;margin:26px 0 6px;color:var(--gold2);border-top:1px solid var(--line);padding-top:18px;}
   h3{font-size:14px;margin:16px 0 4px;color:var(--ink);text-transform:uppercase;letter-spacing:.4px;}
+  h4{font-size:13px;margin:14px 0 4px;color:var(--ink);}
   .sub{color:var(--muted);font-size:13.5px;margin:0 0 8px;}
   a{color:var(--gold2);}
   .back{display:inline-block;margin-bottom:10px;font-weight:600;font-size:13px;}
@@ -97,9 +98,72 @@
   <ul>
     <li><a href="https://www.gold.org/goldhub/data/gold-reserves-by-country">World Gold Council — Gold Reserves by Country</a> (underlying IMF IFS). Quarterly tonnage, value, % of reserves, 2000-Q1+ (123 countries).</li>
     <li><a href="https://data.imf.org/en/datasets//IMF.STA:IL">IMF — International Liquidity (IFS)</a>. Annual gold-reserve volume back to 1950 (187 countries + World aggregate) — drives the 50-year / Max trend windows.</li>
-    <li><a href="https://www.worldbank.org/en/research/commodity-markets">World Bank — Commodity Price Data ("Pink Sheet")</a>, annual gold price 1960+ ($35/oz flat 1950–59).</li>
-    <li><a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD">World Bank — GDP (current US$)</a> for the % of GDP metric.</li>
+    <li><a href="https://www.worldbank.org/en/research/commodity-markets">World Bank — Commodity Price Data ("Pink Sheet")</a>, gold price 1960+ ($35/oz flat 1950–59). Each year is the mean of that year's monthly Pink Sheet prices — the Pink Sheet's own annual definition, kept at full precision. The in-progress year is a year-to-date mean.</li>
+    <li><a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD">World Bank — GDP (current US$)</a> (NY.GDP.MKTP.CD) — the % of GDP denominator for every completed year, 1960 to the latest published year.</li>
+    <li><a href="https://www.imf.org/external/datamapper/NGDPD@WEO">IMF — World Economic Outlook, nominal GDP in US$ (NGDPD)</a>. Used <em>only</em> for the current in-progress year, for which the World Bank publishes no GDP at all. Every World-Bank-covered year uses the World Bank.</li>
   </ul>
+
+  <h4>The current year (2026) is an estimate, and is drawn dashed</h4>
+  <p class="note">No leg of the current year is a completed observation, so the whole year is flagged
+  on the chart (lighter + dashed, like the pre-2005 private-stock back-cast) and in the tooltip:</p>
+  <ul>
+    <li><b>Reserves</b> — each country's <em>latest reported month</em> from the IMF's monthly
+      International Liquidity feed, not a year-end figure. The as-of month differs by country
+      (reporting thins out badly inside the current year) and is shown in the tooltip. A country
+      that has not reported at all this year (Russia, Iran, Venezuela, Cuba…) is left blank rather
+      than carried forward, so its line simply ends at its last reported year — the headline number
+      on those cards carries the year it actually comes from.</li>
+    <li><b>Gold price</b> — the year-to-date average, not a full-year average.</li>
+    <li><b>GDP</b> — an IMF WEO <em>forecast</em>.</li>
+  </ul>
+  <p class="note">Because the numerator is a part-year price and the denominator is a full-year GDP
+  forecast, the current-year point answers "what is today's gold worth against this year's expected
+  output" — it is not a like-for-like year-end reading, and will move as both legs settle.</p>
+  <p class="note">Revisions: GDP denominators track the latest World Bank vintage, so the whole
+  % of GDP history shifts slightly whenever national accounts are revised (the 2024 US denominator
+  moved from $28.75tn to $29.30tn on the July-2026 refresh). Percentages of reserves and of GDP are
+  therefore vintage-dependent; tonnage is not.</p>
+
+  <h3>Long history tab (1870+)</h3>
+  <ul>
+    <li><b>Tonnage, 1870–1945</b> — Timothy Green, <i>Central Bank Gold Reserves: An historical
+      perspective since 1845</i>, World Gold Council Research Study No. 23 (1999), Table 1.
+      <b>Five-yearly</b> (plus 1913), in physical tonnes. gold.org no longer serves this study (it
+      403s every route), so it is read from the
+      <a href="https://web.archive.org/web/20060113014756id_/http://www.gold.org:80/value/stats/statistics/pdf/Pages%20from%20tim-green.pdf">Internet
+      Archive capture</a> and the PDF is vendored into the repo alongside the parser.</li>
+    <li><b>Tonnage, 1950–present</b> — IMF International Liquidity (IFS), annual, as used by the rest
+      of the dashboard. Green's own Table 2 (1950–98) matches it to the tonne (USA 1950 = 20,279 t in
+      both), which is what validates joining the two.</li>
+    <li><b>GDP, pre-1960</b> — <a href="https://www.macrohistory.net/database/">Jordà–Schularick–Taylor
+      Macrohistory Database</a> (R6), nominal GDP converted at its own USD rates, then <b>ratio-chained
+      to the World Bank's 1960 level</b> so the two GDP sources meet without a step at the seam. JST
+      levels are not used directly: its GDP units differ by country and its levels drift ~5–10% from
+      the World Bank. Chaining uses only JST's growth, so both issues cancel. Cross-checked against
+      MeasuringWorth's independent US series: agreement is within 0.1% for 1913–1959 and 2.5% back to
+      1870. <b>GDP, 1960+</b> — World Bank; current year — IMF WEO forecast.</li>
+    <li><b>Gold price</b> — MeasuringWorth NY market price pre-1950; World Bank Pink Sheet 1950+.</li>
+  </ul>
+  <h4>Three things to know before reading this chart</h4>
+  <ul>
+    <li><b>Why it starts in 1870, when the gold data reaches 1845.</b> The limit is the denominator,
+      not the gold: nominal GDP in US$ does not exist for most of these economies before 1870. The
+      only genuinely centuries-long series are the US and UK, which is a different (2-country) chart.</li>
+    <li><b>The shaded era is a pegged price.</b> Gold's USD price was fixed by statute — $20.67/oz to
+      1933, $35/oz to 1971 — so across the shaded band the dollar value of a reserve is an arithmetic
+      consequence of tonnage, the peg and GDP. It carries no market price signal, and moves in
+      "% of GDP" there are mostly GDP moving. <b>Tonnes is the peg-immune metric</b> and is the
+      honest way to read the pre-1971 era.</li>
+    <li><b>Resolution changes across the chart.</b> Dots mark real observations: five-yearly to 1945,
+      annual from 1950. Lines between five-yearly dots are drawn for legibility and are not annual
+      data. <b>1946–49 is deliberately blank</b> — Green's table ends at 1945 and IMF IFS begins in
+      1950; the gap is not interpolated across.</li>
+  </ul>
+  <p class="note">Coverage is 17 countries — those where Green's tonnage and a JST GDP series both
+  exist. Green also reports Russia, Austria-Hungary, India, Argentina, Brazil, South Africa, Turkey
+  and others; they are absent here because they have no matching long-run USD GDP denominator, not
+  because their gold is unknown. Germany combines Green's two separate rows (Imperial Bank + War
+  Fund). Countries carry different spans: only the UK and France have all of Green's columns.</p>
 
   <h3>Private / household gold stock (estimates)</h3>
   <ul>
