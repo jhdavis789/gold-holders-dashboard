@@ -272,14 +272,19 @@
       <p class="note">Every overlapping N-year window (1-year step) for each asset, annualised. Box = inter-quartile
         range with the median; whiskers to the Tukey fence; every individual window plotted as a dot. Gold is the
         only asset with a full pre-WWII record — others begin when clean data does (labelled per asset). Real =
-        deflated by US CPI. Windows start ≥ 1901 and end ≤ 2024 so real returns are always defined.</p>
+        deflated by US CPI. Windows start &ge; 1901 and end &le; 2024 so real returns are always defined.
+        <b>Basis &ldquo;Other&rdquo;</b> prices every asset in units of another asset (e.g. US equities measured in
+        gold): each window shows (1+r<sub>asset</sub>)/(1+r<sub>numeraire</sub>)&minus;1 &mdash; CPI cancels, so the
+        result is the same whether you start from real or nominal. The <b>3m</b> horizon uses the monthly grid and is
+        shown as a <b>total</b>, not annualised, return.</p>
       <div class="controls">
         <span><label class="lbl">Horizon</label><span class="seg" id="horizonSeg">
-          <button data-h="1">1y</button><button data-h="5">5y</button><button data-h="10">10y</button><button data-h="20" class="on">20y</button>
+          <button data-h="0.25" title="3-month windows — monthly step only, shown as TOTAL (not annualised) return">3m</button><button data-h="1">1y</button><button data-h="5">5y</button><button data-h="10">10y</button><button data-h="20" class="on">20y</button>
         </span></span>
         <span><label class="lbl">Basis</label><span class="seg" id="basisSeg">
-          <button data-b="real" class="on">Real (CPI-adj.)</button><button data-b="nominal">Nominal</button>
-        </span></span>
+          <button data-b="real" class="on">Real (CPI-adj.)</button><button data-b="nominal">Nominal</button><button data-b="other" title="Price every asset in units of another asset — e.g. US equities measured in gold">Other &#9662;</button>
+        </span>
+        <select id="numerSel" style="display:none;margin-left:6px" title="Numeraire: every other asset is priced in units of this one"></select></span>
         <span><label class="lbl">Step</label><span class="seg" id="stepSeg" title="Annual = one window per calendar year. Monthly = windows step one month at a time (~12x more overlapping windows; loaded on demand).">
           <button data-s="annual" class="on">Annual</button><button data-s="monthly">Monthly</button>
         </span></span>
@@ -329,8 +334,9 @@
         era (e.g. gold vs equities). Real = CPI-adjusted. Blue = positive co-movement, magenta = negative.</p>
       <div class="controls">
         <span><label class="lbl">Basis</label><span class="seg" id="basisSegC">
-          <button data-b="real" class="on">Real (CPI-adj.)</button><button data-b="nominal">Nominal</button>
-        </span></span>
+          <button data-b="real" class="on">Real (CPI-adj.)</button><button data-b="nominal">Nominal</button><button data-b="other" title="Returns measured relative to another asset">Other &#9662;</button>
+        </span>
+        <select id="numerSelC" style="display:none;margin-left:6px" title="Numeraire: every other asset is priced in units of this one"></select></span>
         <span><label class="lbl">Period</label>
           <span class="rangewrap" id="yearRangeC">
             <span class="rtrack"></span><span class="rfill" id="cFill"></span>
@@ -402,7 +408,10 @@ const NAMEFIX = {'China, P.R.: Mainland':'China','Russian Federation':'Russia',
   'United States of America':'United States','Korea, Republic of':'South Korea'};
 const fixName = n => NAMEFIX[n]||n;
 
-let DATA=null, TS=null, RR=null, MONTHLY=null, DEMO=false, state={tab:'snapshot',sector:'central_banks',metric:'tonnes',window:'20y',scale:'independent',ytop:null,lrMetric:'pct_gdp',lrScale:'independent',lrYtop:null,horizon:'20',basis:'real',yMin:1901,yMax:2025,whatThen:false,step:'annual'};
+let DATA=null, TS=null, RR=null, MONTHLY=null, DEMO=false, state={tab:'snapshot',sector:'central_banks',metric:'tonnes',window:'20y',scale:'independent',ytop:null,lrMetric:'pct_gdp',lrScale:'independent',lrYtop:null,horizon:'20',basis:'real',numer:'gold',yMin:1901,yMax:2025,whatThen:false,step:'annual'};
+// basis: 'real' (CPI-deflated) | 'nominal' | 'other' = priced in units of state.numer (another asset).
+// 'other' is derived client-side from the NOMINAL series: relative return = (1+r_asset)/(1+r_numeraire)-1.
+// Deflating both legs by the same CPI cancels, so real and nominal give the identical relative series.
 // NB: state.ytop = manual top of the SHARED trend Y axis (null = auto). Distinct from state.yMax,
 // which is the rolling-returns period-slider end YEAR — different tab, different meaning.
 // ---- timeline / drag-to-select-a-window state ----
@@ -716,13 +725,118 @@ function renderOrder(){ return RRORDER.concat([...extraSeries]); }   // main 13 
 const YMIN=1871, YMAX=2025, MINSPAN=20;   // slider can drag back to 1871; default left handle stays 1901
 const pct1 = v => (v==null?'—':(v>=0?'+':'')+v.toFixed(1)+'%');
 function rrAsset(key){ return RR.assets.find(a=>a.key===key); }
+
+// ---- horizon helpers (horizons are strings; '0.25' = the 3-month window, monthly-only) ----
+const HY   = h => h==='0.25' ? 0.25 : parseInt(h);        // horizon in years
+const HM   = h => Math.round(HY(h)*12);                   // horizon in months
+const SUBY = h => HY(h) < 1;                              // sub-year: shown as TOTAL return, not annualised
+const HSHORT = h => SUBY(h) ? HM(h)+'m' : HY(h)+'y';
+const HLONG  = h => SUBY(h) ? HM(h)+'-month' : HY(h)+'-year';
+// window end-year label: integers stay plain years, monthly-step fractions render as YYYY-MM
+function ylab(y){ const yr=Math.floor(y+1e-6), m=Math.round((y-yr)*12)+1;
+  return (Math.abs(y-Math.round(y))<1e-6) ? ''+Math.round(y) : yr+'-'+String(m).padStart(2,'0'); }
+const dfracD = d => (+d.slice(0,4)) + (+d.slice(5,7)-1)/12;
+
+// ---- basis helpers ----
+function numerLabel(){ const a=RR&&rrAsset(state.numer); return a?a.label:state.numer; }
+function basisLabel(){ return state.basis==='real' ? 'real (CPI-adjusted)'
+                          : state.basis==='nominal' ? 'nominal'
+                          : 'priced in '+numerLabel(); }
+function basisShort(){ return state.basis==='real'?'real':state.basis==='nominal'?'nominal':'vs '+numerLabel(); }
+const relRet = (ra,rn) => ((1+ra/100)/(1+rn/100)-1)*100;   // both annualised over the SAME window → exact
+
+// annual return series for the current basis (used by the correlation matrix + "what then" vol)
+let _annB=null,_annBkey='';
+function annualB(){
+  if(!RR||!RR.annual) return {};
+  if(state.basis!=='other') return RR.annual[state.basis]||{};
+  const kk='other|'+state.numer; if(_annB&&_annBkey===kk) return _annB;
+  const base=RR.annual.nominal||{}, num=base[state.numer], out={};
+  if(num){
+    const nm=new Map(); num.years.forEach((y,i)=>nm.set(y,num.rets[i]));
+    Object.keys(base).forEach(k=>{
+      if(k===state.numer) return;
+      const d=base[k], years=[], rets=[];
+      d.years.forEach((y,i)=>{ const r=nm.get(y); if(r==null) return; years.push(y); rets.push(relRet(d.rets[i],r)); });
+      if(years.length) out[k]={years,rets};
+    });
+  }
+  _annB=out; _annBkey=kk; return out;
+}
+// monthly level indices for the current basis; 'other' = asset level ÷ numeraire level, rebased to 100
+let _lvlO=null,_lvlOkey='';
+function levelsB(){
+  if(!LVL) return null;
+  if(state.basis!=='other') return LVL[state.basis];
+  if(_lvlO&&_lvlOkey===state.numer) return _lvlO;
+  const NUM=LVL.nominal[state.numer]; if(!NUM) return null;
+  const out={};
+  Object.keys(LVL.nominal).forEach(k=>{
+    const A=LVL.nominal[k], r=new Array(A.length);
+    for(let i=0;i<A.length;i++) r[i]=(A[i]==null||NUM[i]==null||NUM[i]<=0||A[i]<=0)?null:A[i]/NUM[i];
+    let f=0; while(f<r.length&&r[f]==null) f++;
+    if(f<r.length){ const b=r[f]; for(let i=f;i<r.length;i++) if(r[i]!=null) r[i]=r[i]/b*100; }
+    out[k]=r;
+  });
+  _lvlO=out; _lvlOkey=state.numer; return out;
+}
+function clearBasisCache(){ _annB=null; _annBkey=''; _lvlO=null; _lvlOkey=''; }
+// every Tm-month rolling window per asset, computed from the monthly level indices
+function windowsFromLevels(Tm, annualise){
+  const lv=levelsB(); if(!lv||!MONTHLY) return {};
+  const dates=MONTHLY.dates, out={};
+  Object.keys(lv).forEach(k=>{
+    if(state.basis==='other'&&k===state.numer) return;      // numeraire vs itself is identically 0
+    const L=lv[k], years=[], returns=[];
+    for(let s=0;s+Tm<L.length;s++){
+      const a=L[s], b=L[s+Tm]; if(a==null||b==null||a<=0||b<=0) continue;
+      years.push(dfracD(dates[s+Tm]));
+      returns.push(annualise ? ((b/a)**(12/Tm)-1)*100 : (b/a-1)*100);
+    }
+    if(years.length) out[k]={years,returns};
+  });
+  return out;
+}
+// the {asset:{years,returns}} block behind the fixed-horizon boxes, for the current basis/step/horizon
+function fixedBlock(){
+  const H=state.horizon;
+  if(SUBY(H)) return windowsFromLevels(HM(H), false);        // no precomputed sub-year block — derive, un-annualised
+  const SRC=(state.step==='monthly'&&MONTHLY)?MONTHLY.data:RR.data;
+  if(state.basis!=='other') return (SRC[state.basis]||{})[H]||{};
+  const base=(SRC.nominal||{})[H]||{}, num=base[state.numer]; if(!num) return {};
+  const nm=new Map(); num.years.forEach((y,i)=>nm.set(Math.round(y*10000),num.returns[i]));
+  const out={};
+  Object.keys(base).forEach(k=>{
+    if(k===state.numer) return;
+    const d=base[k], years=[], returns=[];
+    for(let i=0;i<d.years.length;i++){
+      const r=nm.get(Math.round(d.years[i]*10000)); if(r==null) continue;   // pair windows ending the same month
+      years.push(d.years[i]); returns.push(relRet(d.returns[i],r));
+    }
+    if(years.length) out[k]={years,returns};
+  });
+  return out;
+}
+function syncBasisUI(){
+  const other=state.basis==='other';
+  [['numerSel','basisSeg'],['numerSelC','basisSegC']].forEach(([selId,segId])=>{
+    const sel=document.getElementById(selId); if(!sel) return;
+    sel.style.display=other?'':'none';
+    if(RR&&(!sel.options.length||sel.dataset.n!=RR.assets.length)){
+      sel.innerHTML=RR.assets.map(a=>`<option value="${a.key}">${a.label}${a.secondary?' (secondary)':''}</option>`).join('');
+      sel.dataset.n=RR.assets.length;
+    }
+    sel.value=state.numer;
+    document.querySelectorAll('#'+segId+' button').forEach(b=>b.classList.toggle('on',b.dataset.b===state.basis));
+  });
+}
 function quantile(s,p){ const i=(s.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return s[lo]+(s[hi]-s[lo])*(i-lo); }
 function jstats(arr,years,N){
   if(!arr.length) return null;
   const s=[...arr].sort((a,b)=>a-b), e=years[years.length-1];
   return {n:arr.length, min:s[0], q1:quantile(s,.25), median:quantile(s,.5), q3:quantile(s,.75), max:s[s.length-1],
           pct_negative:arr.filter(x=>x<0).length/arr.length*100, latest:arr[arr.length-1],
-          first_window:(years[0]-N)+'–'+years[0], latest_window:(e-N)+'–'+e};
+          first_window:ylab(years[0]-N)+'–'+ylab(years[0]), latest_window:ylab(e-N)+'–'+ylab(e)};
 }
 const SLIDERS=[['yrMin','yrMax','rFill','yrLabel'],['cyrMin','cyrMax','cFill','cyrLabel']];
 function syncSliderVisual(){
@@ -750,8 +864,8 @@ function corrColor(c){ const a=Math.min(1,Math.abs(c)); const al=(0.10+0.80*a).t
 function renderCorr(){
   if(!RR||!RR.annual) return;
   syncSliderVisual();
-  const B=state.basis, lo=+state.yMin, hi=+state.yMax, ann=RR.annual[B];
-  document.querySelectorAll('#basisSegC button').forEach(b=>b.classList.toggle('on',b.dataset.b===B));
+  const B=state.basis, lo=+state.yMin, hi=+state.yMax, ann=annualB();
+  syncBasisUI();
   const keys=RRORDER.filter(k=>ann[k]&&ann[k].rets.length);
   const maps=keys.map(k=>{ const m=new Map(); ann[k].years.forEach((y,i)=>{ if(y>=lo&&y<=hi) m.set(y,ann[k].rets[i]); }); return m; });
   let h='<table class="corr"><thead><tr><th></th>'+keys.map(k=>`<th title="${rrAsset(k).label}">${CSHORT[k]}</th>`).join('')+'</tr></thead><tbody>';
@@ -770,8 +884,10 @@ function renderCorr(){
   });
   h+='</tbody></table>';
   document.getElementById('corrMatrix').innerHTML=h;
-  document.getElementById('corrNote').textContent=(B==='real'?'Real':'Nominal')+' annual-return correlations · period '+lo+'–'+hi+' · pairwise-overlapping years';
-  document.getElementById('corrFoot').innerHTML='<b>Pearson correlation of annual '+(B==='real'?'real (CPI-adj.)':'nominal')+' total returns.</b> Each pair uses its overlapping years within the selected Period; cells with &lt;5 overlapping years show "·". Blue = positive, magenta = negative co-movement; intensity = strength. Same sources as the Rolling-returns tab (see its footnote / <code>SOURCES.md</code>).';
+  const cLab=basisLabel();
+  document.getElementById('corrNote').textContent=cLab[0].toUpperCase()+cLab.slice(1)+' annual-return correlations · period '+lo+'–'+hi+' · pairwise-overlapping years';
+  document.getElementById('corrFoot').innerHTML='<b>Pearson correlation of annual '+cLab+' total returns.</b> Each pair uses its overlapping years within the selected Period; cells with &lt;5 overlapping years show "·". Blue = positive, magenta = negative co-movement; intensity = strength. Same sources as the Rolling-returns tab (see its footnote / <code>SOURCES.md</code>).'
+    +(B==='other'?' <b>Priced in '+numerLabel()+':</b> each year\'s return is (1+r<sub>asset</sub>)/(1+r<sub>'+numerLabel()+'</sub>)−1, so these are correlations of <i>excess-over-'+numerLabel()+'</i> returns — the numeraire itself drops out.':'');
 }
 
 function renderReturns(){   // dispatcher: timeline-drag custom window vs fixed 1/5/10/20y horizon
@@ -782,10 +898,19 @@ function renderReturnsFixed(){
   if(!RR) return;
   rrHL=null;
   if(rrChart){ rrChart.destroy(); rrChart=null; }
-  const H=state.horizon, B=state.basis, N=parseInt(H), lo=+state.yMin, hi=+state.yMax;
-  const SRCDATA=(state.step==='monthly'&&MONTHLY)?MONTHLY.data:RR.data;   // monthly is lazy-loaded
-  const blk=SRCDATA[B][H];
-  document.querySelectorAll('#stepSeg button').forEach(b=>b.classList.toggle('on',b.dataset.s===state.step));
+  const H=state.horizon, B=state.basis, N=HY(H), lo=+state.yMin, hi=+state.yMax;
+  if(SUBY(H)) state.step='monthly';        // sub-year windows only exist on the monthly grid
+  if((SUBY(H)||state.step==='monthly') && !MONTHLY){        // needed data not loaded yet — fetch, then redraw
+    document.getElementById('rrNote').textContent='Loading monthly data…';
+    ensureMonthly(()=>renderReturns());
+    return;
+  }
+  const blk=fixedBlock();
+  document.querySelectorAll('#stepSeg button').forEach(b=>{
+    b.classList.toggle('on',b.dataset.s===state.step);
+    b.disabled = SUBY(H) && b.dataset.s==='annual';         // no annual-step 3-month window
+    b.style.opacity = b.disabled?0.4:'';
+  });
   syncSliderVisual();
   // filter every asset's windows to those fully inside [lo,hi]; recompute stats client-side
   const rows=[];
@@ -799,14 +924,16 @@ function renderReturnsFixed(){
   });
   rrRows = rows;
   if(wtSel && !rows.some(r=>r.key===wtSel.key)) wtSel=null;
-  const bLab = B==='real' ? 'real (CPI-adjusted)' : 'nominal';
+  const bLab = basisLabel();
+  const retWord = SUBY(H) ? 'total' : 'annualised';         // 3-month windows are NOT annualised
+  const retPhrase = SUBY(H) ? 'total return (not annualised)' : 'annualised total return';
   document.querySelectorAll('#horizonSeg button').forEach(b=>b.classList.toggle('on',b.dataset.h===H));
-  document.querySelectorAll('#basisSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===B));
+  syncBasisUI();
   document.getElementById('rrWrap').style.height = Math.max(200, rows.length*46+110)+'px';
 
   if(!rows.length){
-    document.getElementById('rrTable').innerHTML='<p class="note">No '+H+'-year windows fit inside '+lo+'–'+hi+' (need a span ≥ '+H+' years). Widen the period.</p>';
-    document.getElementById('rrNote').textContent=bLab[0].toUpperCase()+bLab.slice(1)+', '+H+'y · '+lo+'–'+hi+' · 0 windows';
+    document.getElementById('rrTable').innerHTML='<p class="note">No '+HLONG(H)+' windows fit inside '+lo+'–'+hi+'. Widen the period'+(B==='other'?', or pick a numeraire with a longer history':'')+'.</p>';
+    document.getElementById('rrNote').textContent=bLab[0].toUpperCase()+bLab.slice(1)+', '+HSHORT(H)+' · '+lo+'–'+hi+' · 0 windows';
   } else {
     // Bitcoin's returns are ~10× the others' — switch to a log x-axis (in growth-multiple space) when it's shown.
     const logMode = rows.some(r=>r.key==='btc');
@@ -829,7 +956,7 @@ function renderReturnsFixed(){
       type:'boxplot',
       plugins:[wtDots,hlDots],
       data:{labels:rows.map(r=>r.label+(r.annual_only?' *':'')+'  ('+Math.floor(r.years[0]-N)+'–)'),datasets:[{
-        label:H+'y annualised return',
+        label:HSHORT(H)+' '+retWord+' return',
         data:rows.map(r=>r.arr.map(rrToX)),
         backgroundColor:rows.map(r=>r.color+'2e'), borderColor:rows.map(r=>r.color), borderWidth:1.6,
         itemRadius:0, itemStyle:'circle', itemHitRadius:3,
@@ -849,11 +976,11 @@ function renderReturnsFixed(){
         scales:{
           x:logMode?{
              type:'logarithmic', min:logMin, max:logMax,
-             title:{display:true,text:H+'-year '+bLab+' annualised total return — LOG scale (Bitcoin shown)',color:'#5e6b7e'},
+             title:{display:true,text:HLONG(H)+' '+bLab+' '+retPhrase+' — LOG scale (Bitcoin shown)',color:'#5e6b7e'},
              afterBuildTicks:s=>{ s.ticks=logTicks.map(v=>({value:v})); },   // human-readable return anchors only
              ticks:{color:'#5e6b7e',autoSkip:false,callback:v=>fmtPct((v-1)*100)},   // tick value = growth multiple → label as %
              grid:{color:c=>c.tick.value===1?'#13294b':'#e2e8f1', lineWidth:c=>c.tick.value===1?1.6:1}}   // 0% return = ×1.0
-          :{title:{display:true,text:H+'-year '+bLab+' annualised total return (%)',color:'#5e6b7e'},
+          :{title:{display:true,text:HLONG(H)+' '+bLab+' '+retPhrase+' (%)',color:'#5e6b7e'},
              ticks:{color:'#5e6b7e',callback:v=>v+'%'},
              grid:{color:c=>c.tick.value===0?'#13294b':'#e2e8f1', lineWidth:c=>c.tick.value===0?1.6:1}},
           y:{ticks:{color:'#13294b',font:{weight:'600'}},grid:{display:false}}
@@ -872,15 +999,17 @@ function renderReturnsFixed(){
     h+='</tbody></table>';
     document.getElementById('rrTable').innerHTML=h;
     document.getElementById('rrNote').textContent =
-      bLab[0].toUpperCase()+bLab.slice(1)+', '+H+'-year overlapping windows · period '+lo+'–'+hi+' · '+rows.length+' assets'
+      bLab[0].toUpperCase()+bLab.slice(1)+', '+HLONG(H)+' overlapping windows ('+retWord+') · period '+lo+'–'+hi+' · '+rows.length+' assets'
       + (state.step==='monthly' ? ' · MONTHLY step (~12× windows; gold & housing pre-modern monthly-interpolated)' : '');
   }
   const indep = Math.max(1, Math.round((hi-lo+1)/N));
   document.getElementById('rrFoot').innerHTML =
     '<b>* annual data only</b> — these series (gold, US housing) have no monthly source, so in <b>Monthly</b> step their pre-modern values are interpolated from real annual averages (gold pre-1968 is a genuinely flat peg). All other series are true monthly.'
     +'<br><b>Window floor 1871</b> (Shiller CPI start): deep-history assets (equities, gold, 10y Treasury, cash) now reach back to 1871. The Period dragger defaults to 1901 — drag the left handle back to 1871 to include the earlier windows.'
-    +'<br><b>Method:</b> '+RR.meta.method+' Each box plots every overlapping '+H+'y window; whiskers = Tukey fence, dots = individual windows (stacked within each row by time — oldest window at top, newest at bottom).'
-    +'<br><b>Read with care:</b> overlapping windows are highly autocorrelated — '+H+'y over '+lo+'–'+hi+' gives many windows but only ~'+indep+' <i>independent</i> ones. '
+    +'<br><b>Method:</b> '+RR.meta.method+' Each box plots every overlapping '+HSHORT(H)+' window; whiskers = Tukey fence, dots = individual windows (stacked within each row by time — oldest window at top, newest at bottom).'
+    + (SUBY(H) ? ' <b>'+HLONG(H)+' windows are TOTAL returns, not annualised</b> — annualising a quarter multiplies its noise by four; they are computed from the monthly total-return level indices (monthly step only).' : '')
+    + (B==='other' ? ' <b>Priced in '+numerLabel()+':</b> each window\'s figure is (1+r<sub>asset</sub>)/(1+r<sub>'+numerLabel()+'</sub>)−1 over the same window — how much the asset gained <i>on</i> '+numerLabel()+', i.e. its return measured in units of '+numerLabel()+' rather than dollars. Derived from the nominal series; CPI cancels out of the ratio, so the real and nominal bases give the identical relative result. '+numerLabel()+' itself drops out (it is flat against itself).' : '')
+    +'<br><b>Read with care:</b> overlapping windows are highly autocorrelated — '+HSHORT(H)+' over '+lo+'–'+hi+' gives many windows but only ~'+indep+' <i>independent</i> ones. '
     +'The box shows the <i>historical spread</i> of past windows, not a forward confidence interval. Drag the <b>Period</b> handles to clip the sample to any sub-era. '
     +'<b>Gold pre-1971</b> was an administered peg, not a market price (US: $20.67/oz to 1933, $35 to 1968; the 1934 +69% step is the Gold Reserve Act devaluation, US private ownership illegal 1933–74) — pre-1971 gold windows reflect the peg + inflation, not an investable return. '
     +'<b>Commodities</b> and <b>US housing</b> are <i>spot price</i> indices (no roll/collateral, no rent): a collateralized commodity or rented home would additionally earn carry — interpret as price-only. '
@@ -964,7 +1093,7 @@ const wtBands={
     const ctx=chart.ctx, base=+MONTHLY.dates[0].slice(0,4), NL=MONTHLY.dates.length;
     const y2i=fy=>{ const y=Math.floor(fy); let m=Math.round((fy-y)*12)+1; if(m<1)m=1; if(m>12)m=12;
       return Math.max(0,Math.min(NL-1,(y-base)*12+(m-1))); };   // grid is contiguous monthly from `base`
-    const spanM = selWin ? selWin.Tm : parseInt(state.horizon)*12;   // window length: custom Tm months, else N years
+    const spanM = selWin ? selWin.Tm : HM(state.horizon);   // window length: custom Tm months, else the fixed horizon
     const bandH=Math.min(36,(ca.bottom-ca.top)*0.30), y0=ca.bottom-bandH;
     ctx.save();
     ctx.beginPath(); ctx.rect(ca.left,ca.top,ca.right-ca.left,ca.bottom-ca.top); ctx.clip();
@@ -993,16 +1122,18 @@ function cstats(arr){
 function renderReturnsCustom(){
   if(rrChart){ rrChart.destroy(); rrChart=null; }
   const B=state.basis, lo=+state.yMin, hi=+state.yMax, Tm=selWin.Tm;
-  const dates=MONTHLY.dates, lvB=LVL[B];
-  const dfrac=d=>{ const y=+d.slice(0,4), m=+d.slice(5,7); return y+(m-1)/12; };
+  const dates=MONTHLY.dates, lvB=levelsB();
+  const dfrac=dfracD;
   const wLab = Tm%12===0 ? (Tm/12)+'y' : Tm+'mo';
-  const bLab = B==='real' ? 'real (CPI-adjusted)' : 'nominal';
+  const bLab = basisLabel();
+  if(!lvB){ document.getElementById('rrTable').innerHTML='<p class="note">No level data for the selected basis.</p>'; return; }
   const winStr = dates[selWin.i]+' → '+dates[selWin.j];
   document.querySelectorAll('#horizonSeg button').forEach(b=>b.classList.remove('on'));
-  document.querySelectorAll('#basisSeg button').forEach(b=>b.classList.toggle('on',b.dataset.b===B));
+  syncBasisUI();
 
   const rows=[];
   renderOrder().forEach(k=>{
+    if(B==='other'&&k===state.numer) return;      // the numeraire is flat against itself
     const L=lvB[k]; if(!L) return;
     const arr=[], yy=[];
     for(let s=0;s+Tm<L.length;s++){
@@ -1093,7 +1224,8 @@ function renderReturnsCustom(){
     '<b>Timeline mode.</b> Each box is the distribution of every overlapping <b>'+wLab+'</b> window (monthly step) for that asset, annualised; the large '
     +'<b>●</b> marks your dragged window <b>'+winStr+'</b>. Levels are total-return indices rebased to 100 at each series’ start (return-neutral). '
     +'Sub-year windows are <i>annualised</i> — a big multiplier on short spans, so read the total-return figure (chart tooltip / column title) alongside it. '
-    +'Gold &amp; housing deep history is monthly-interpolated from annual averages (starred *). Drag a new period to update, or <b>Clear window</b> to return to the fixed 1/5/10/20y horizons.';
+    +'Gold &amp; housing deep history is monthly-interpolated from annual averages (starred *). Drag a new period to update, or <b>Clear window</b> to return to the fixed 3m/1/5/10/20y horizons.'
+    + (B==='other' ? ' <b>Priced in '+numerLabel()+':</b> levels are the asset\'s total-return index divided by '+numerLabel()+'\'s, rebased to 100 — returns are how much the asset gained on '+numerLabel()+' (CPI cancels, so real and nominal agree).' : '');
 }
 
 // ---- timeline: draggable log-level line that defines the custom window ----
@@ -1112,7 +1244,7 @@ function buildTlAssetSel(){
 function drawTimeline(){
   if(state.tab!=='returns') return;
   ensureMonthly(()=>{
-    const B=state.basis, dates=MONTHLY.dates, L=LVL[B][tlAsset];
+    const B=state.basis, dates=MONTHLY.dates, lvB=levelsB(), L=lvB&&lvB[tlAsset];
     const cvEl=document.getElementById('tlCanvas'); if(!L||!cvEl) return;
     let i0=0; while(i0<L.length&&L[i0]==null) i0++;
     let i1=L.length-1; while(i1>0&&L[i1]==null) i1--;
@@ -1132,7 +1264,7 @@ function drawTimeline(){
                callback(v){ const d=this.getLabelForValue(v); return d?d.slice(0,4):d; }},
              grid:{color:'#e2e8f1'}},
           y:{type:'logarithmic',
-             title:{display:true,text:a.label+' — growth of $100 ('+(B==='real'?'real':'nominal')+', log scale)',color:'#5e6b7e'},
+             title:{display:true,text:a.label+(B==='other'?' — growth of 100 units of '+numerLabel()+' (log scale)':' — growth of $100 ('+(B==='real'?'real':'nominal')+', log scale)'),color:'#5e6b7e'},
              ticks:{color:'#5e6b7e',callback:v=>{ const t=[1,3,10,30,100,300,1000,3000,10000,30000,100000,300000,1000000,3000000];
                return t.indexOf(v)>=0?(v>=1000?(v/1000)+'k':''+v):''; }},
              grid:{color:'#e2e8f1'}}}}});
@@ -1175,7 +1307,7 @@ function applyWtStyling(){
 }
 // volatility "along the way" = stdev (sample) of the annual returns experienced inside the window
 function wtComputeVol(key,endYear,N,B){
-  const a=RR.annual&&RR.annual[B]&&RR.annual[B][key]; if(!a) return null;
+  const ab=annualB(), a=ab&&ab[key]; if(!a) return null;
   const start=endYear-N+1, vals=[];
   a.years.forEach((y,i)=>{ if(y>=start&&y<=endYear) vals.push(a.rets[i]); });
   if(vals.length<2) return null;
@@ -1193,7 +1325,13 @@ function syncWhatThen(){
 }
 function renderWhatThenPanel(){
   const p=document.getElementById('rrWhatThen'); if(!p) return;
-  const N=parseInt(state.horizon), B=state.basis, bLab=B==='real'?'real':'nominal';
+  const N=HY(state.horizon), B=state.basis, bLab=basisShort();
+  if(SUBY(state.horizon)){          // vol "along the way" is built from ANNUAL returns — meaningless inside a quarter
+    p.innerHTML=WTX+'<h3>What then?</h3><div class="wtinstr">This explorer needs a horizon of <b>1 year or more</b> — '
+      +'it lists each window\'s calendar years and the volatility experienced along the way, both of which are annual. '
+      +'Pick 1y, 5y, 10y or 20y.</div>';
+    return;
+  }
   if(!wtSel){
     p.innerHTML=WTX+'<h3>What then?</h3><div class="wtinstr">Drag horizontally across <b>one asset’s row</b> to pick a band of '
       +N+'y '+bLab+' annualised returns (e.g. S&amp;P 5%–6%).<br><br>You’ll get every window inside that band — its '
@@ -1211,7 +1349,7 @@ function renderWhatThenPanel(){
     h+='<table><thead><tr><th>Window</th><th>Ann.</th><th>Vol</th></tr></thead><tbody>';
     wins.forEach(w=>{ const v=wtComputeVol(wtSel.key,w.end,N,B);
       const volTxt=v?(v.vol.toFixed(1)+'%'+(v.n<N?'<span class="warn" title="only '+v.n+' annual obs inside this window">*</span>':'')):'—';
-      h+='<tr><td>'+(w.end-N)+'–'+w.end+'</td><td class="v">'+pct1(w.ret)+'</td><td>'+volTxt+'</td></tr>';
+      h+='<tr><td>'+ylab(w.end-N)+'–'+ylab(w.end)+'</td><td class="v">'+pct1(w.ret)+'</td><td>'+volTxt+'</td></tr>';
     });
     h+='</tbody></table>';
   }
@@ -1250,8 +1388,8 @@ function applyState(){
   if(state.tab==='returns'){ renderReturns(); drawTimeline(); updateSelInfo(); }
   if(state.tab==='corr') renderCorr();
   const q=new URLSearchParams(); q.set('tab',state.tab);
-  if(state.tab==='returns'){ q.set('horizon',state.horizon); q.set('basis',state.basis); q.set('from',state.yMin); q.set('to',state.yMax); }
-  else if(state.tab==='corr'){ q.set('basis',state.basis); q.set('from',state.yMin); q.set('to',state.yMax); }
+  if(state.tab==='returns'){ q.set('horizon',state.horizon); q.set('basis',state.basis); q.set('from',state.yMin); q.set('to',state.yMax); if(state.basis==='other') q.set('numer',state.numer); }
+  else if(state.tab==='corr'){ q.set('basis',state.basis); q.set('from',state.yMin); q.set('to',state.yMax); if(state.basis==='other') q.set('numer',state.numer); }
   else if(state.tab==='longrun'){ q.set('lrmetric',state.lrMetric); q.set('lrscale',state.lrScale);
          if(state.lrScale==='shared' && state.lrYtop!=null) q.set('lrytop',state.lrYtop); }
   else { q.set('sector',state.sector); q.set('metric',state.metric); q.set('window',state.window); q.set('scale',state.scale);
@@ -1265,6 +1403,7 @@ function initState(){
   if(q.get('lrmetric'))state.lrMetric=q.get('lrmetric'); if(q.get('lrscale'))state.lrScale=q.get('lrscale');
   if(q.get('lrytop')){ const t=parseFloat(q.get('lrytop')); if(isFinite(t) && t>0) state.lrYtop=t; }
   if(q.get('horizon'))state.horizon=q.get('horizon'); if(q.get('basis'))state.basis=q.get('basis');
+  if(q.get('numer'))state.numer=q.get('numer');
   if(q.get('from'))state.yMin=Math.max(YMIN,Math.min(YMAX,parseInt(q.get('from'))||1901));
   if(q.get('to'))state.yMax=Math.max(YMIN,Math.min(YMAX,parseInt(q.get('to'))||2025));
   if(state.yMin>state.yMax){const t=state.yMin;state.yMin=state.yMax;state.yMax=t;}
@@ -1272,6 +1411,10 @@ function initState(){
   // ?demo=on (also 1/true/yes) → guided tour of the rolling-returns page. Captured here because
   // applyState() rewrites the query string from scratch, dropping the demo flag after first render.
   if(/^(1|on|true|yes)$/i.test(q.get('demo')||'')){ DEMO=true; state.tab='returns'; }
+  // guard the URL-supplied enums so a hand-edited link can't wedge the page
+  if(['real','nominal','other'].indexOf(state.basis)<0) state.basis='real';
+  if(['0.25','1','5','10','20'].indexOf(state.horizon)<0) state.horizon='20';
+  if(RR&&!RR.assets.some(a=>a.key===state.numer)) state.numer='gold';
 }
 
 async function boot(){
@@ -1310,6 +1453,8 @@ async function boot(){
   document.getElementById('lrYtopClear').onclick=()=>{ state.lrYtop=null; lrInp.value=''; applyState(); };
   document.querySelectorAll('#horizonSeg button').forEach(b=>b.onclick=()=>{wtSel=null;selWin=null;rrHL=null;updateBand();updateSelInfo();state.horizon=b.dataset.h;applyState();});
   document.querySelectorAll('#basisSeg button, #basisSegC button').forEach(b=>b.onclick=()=>{wtSel=null;state.basis=b.dataset.b;applyState();});
+  ['numerSel','numerSelC'].forEach(id=>{ const sel=document.getElementById(id); if(!sel) return;
+    sel.onchange=()=>{ state.numer=sel.value; state.basis='other'; wtSel=null; clearBasisCache(); applyState(); }; });
   document.querySelectorAll('#stepSeg button').forEach(b=>b.onclick=()=>{
     const s=b.dataset.s; wtSel=null; refreshTlBands();
     if(s==='monthly' && !MONTHLY){                       // lazy-load the monthly dataset on first use
@@ -1459,7 +1604,7 @@ boot();
   const TOUR=[
     {el:()=>document.getElementById('horizonSeg').parentElement,
      ttl:'1 · Pick a horizon',
-     txt:'Each dot is one rolling holding period, annualised. Switch between <b>1, 5, 10 or 20-year</b> horizons here — every box and dot recomputes instantly.'},
+     txt:'Each dot is one rolling holding period, annualised. Switch between <b>3-month, 1, 5, 10 or 20-year</b> horizons here — every box and dot recomputes instantly. (3-month windows are shown as total, not annualised, returns.)'},
     {el:()=>document.getElementById('yearRange').parentElement,
      ttl:'2 · Set the time period',
      txt:'Drag the two handles to limit which years count — e.g. post-1971 only. The URL updates as you go, so any view you build is shareable by copying the link.'},
